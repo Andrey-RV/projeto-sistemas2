@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+import matplotlib.pyplot as plt
 
 class FourierFilter:
     def __init__(self, sample_rate, is_full_period=True):
@@ -56,3 +56,12 @@ class PhasorEstimator:
 signal = pd.read_csv("./sinal.dat", delimiter='\t', names=['t', 'x'])
 phasor = PhasorEstimator(signal=signal['x'], sample_rate=12, is_full_period=True)
 phasor.estimate()
+
+plt.plot(signal['t'], signal['x'], '-o', label='Sinal')
+plt.plot(signal['t'], phasor.amplitude[:61], '-o', label="Amplitude do fasor estimado")
+plt.legend(prop={'size': 9})
+plt.show()
+plt.plot(signal['t'], phasor.amplitude[:61])
+plt.show()
+plt.plot(signal['t'], phasor.phase[0:61])
+plt.show()
