@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
 class FourierFilter:
     def __init__(self, sample_rate, is_full_period=True):
         '''
@@ -38,8 +39,6 @@ class PhasorEstimator:
             is_full_period: se a estimação será feito com um filtro de período completo ou de meio período
         '''
         self.signal = signal
-        self.sample_rate = sample_rate
-        self.is_full_period = is_full_period
         self.fourier_filter = FourierFilter(sample_rate, is_full_period)
 
     def estimate(self):
