@@ -1,7 +1,14 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from anti_aliasing import AntiAliasingFilter
+from mimic_filter import MimicFilter
 from fourier_filter import PhasorEstimator
+
+
+R = 0.0246 * 200  # 200 km de linha de transmissão com resistência de 0.0246 ohm/km.
+XL = 0.3219 * 200  # 200 km de linha de transmissão com reatância de 0.3219 ohm/km.
+L = XL / (2 * np.pi * 60)  # Indutância da linha @ 60 Hz.
 
 
 def resample(signal, md: int):
@@ -18,8 +25,8 @@ def resample(signal, md: int):
 
 # Leitura dos sinais do emissor. Colunas renomeadas pois o arquivo não possui cabeçalho.
 emitter_signals = pd.read_csv("./Atividade_01/1Reg1.dat", delimiter='\s+',
-                             names=['1', 't', '3', '4', '5', '6', 'va', 'vb', 'vc',
-                                    '10', 'ia', 'ib', 'ic', '14', '15', '16', '17', '18'])
+                              names=['1', 't', '3', '4', '5', '6', 'va', 'vb', 'vc',
+                                     '10', 'ia', 'ib', 'ic', '14', '15', '16', '17', '18'])
 
 original_sampling_period = emitter_signals['t'][1] - emitter_signals['t'][0]
 va = emitter_signals['va']
@@ -59,16 +66,52 @@ axis[1].grid()
 axis[1].legend(prop={'size': 7})
 plt.show()
 
-# Estimação de fasores.
-phasor_va = PhasorEstimator(resampled_va, samples_per_cycle=16)
-phasor_ia = PhasorEstimator(resampled_ia, samples_per_cycle=16)
-phasor_va.estimate()
-phasor_ia.estimate()
+# Filtro mímico.
+tau = (L / R) / new_sampling_period
+mimic_filter_va = MimicFilter(resampled_va, tau, new_sampling_period)
+mimic_filter_ia = MimicFilter(resampled_ia, tau, new_sampling_period)
+mimic_filter_va.apply_filter()
+mimic_filter_ia.apply_filter()
+mimic_filtered_va = mimic_filter_va.filtered_signal
+mimic_filtered_ia = mimic_filter_ia.filtered_signal
 
-# Figura representando o sinal reamostrado e o fasor estimado para va.
+print(np.mean(resampled_va), np.mean(mimic_filtered_va))
+print(np.mean(resampled_ia), np.mean(mimic_filtered_ia))
+
+# Figura representando va e ia reamostrados e o sinal filtrado pelo filtro mímico.
 figure, axis = plt.subplots(2, 1)
 axis[0].plot(new_time_points, resampled_va, label=r'$v_a(kM_d\dot\Delta t_1)$', color='blue',
              marker='o', markersize=3, markerfacecolor='black')
+mimic_filter_va.apply_filter()
+axis[0].plot(new_time_points, mimic_filtered_va, label=r'$v_a(kM_d\dot\Delta t_1)$' + ' pós filtro mímico', color='red',
+             marker='o', markersize=3, markerfacecolor='red')
+axis[0].set_title('Tensão na fase A do Emissor')
+axis[0].set_xlabel('Tempo (s)')
+axis[0].set_ylabel('Tensão (V)')
+axis[0].grid()
+axis[0].legend()
+axis[1].plot(new_time_points, resampled_ia, label=r'$i_a(kM_d\dot\Delta t_1)$', color='blue',
+             marker='o', markersize=3, markerfacecolor='black')
+mimic_filter_ia.apply_filter()
+axis[1].plot(new_time_points, mimic_filtered_ia, label=r'$i_a(kM_d\dot\Delta t_1)$' + ' pós filtro mímico', color='red',
+             marker='o', markersize=3, markerfacecolor='red')
+axis[1].set_title('Corrente na fase A do Emissor')
+axis[1].set_xlabel('Tempo (s)')
+axis[1].set_ylabel('Corrente (A)')
+axis[1].grid()
+axis[1].legend()
+plt.show()
+
+# Estimação de fasores.
+phasor_va = PhasorEstimator(mimic_filtered_va, samples_per_cycle=16)
+phasor_ia = PhasorEstimator(mimic_filtered_ia, samples_per_cycle=16)
+phasor_va.estimate()
+phasor_ia.estimate()
+
+# Figura representando o sinal após filtro mímico e o fasor estimado para va.
+figure, axis = plt.subplots(2, 1)
+axis[0].plot(new_time_points, mimic_filtered_va, label=r'$v_a(kM_d\dot\Delta t_1)$' + 'pós filtro mímico', color='blue',
+             marker='o', markersize=3, markerfacecolor='blue')
 axis[0].plot(new_time_points, phasor_va.amplitude[:2301], label=r'$|V_a|$', color='red')
 axis[0].set_title('Tensão na fase A do Emissor')
 axis[0].set_xlabel('Tempo (s)')
@@ -82,11 +125,11 @@ axis[1].legend()
 axis[1].grid()
 plt.show()
 
-# Figura representando o sinal reamostrado e o fasor estimado para ia.
+# Figura representando o sinal após filtro mímico e o fasor estimado para ia.
 figure, axis = plt.subplots(2, 1)
-axis[0].plot(new_time_points, resampled_ia, label=r'$i_a(kM_d\dot\Delta t_1)$', color='blue',
-             marker='o', markersize=3, markerfacecolor='black')
-axis[0].plot(new_time_points, phasor_ia.amplitude[:2301], label='amplitude', color='red')
+axis[0].plot(new_time_points, mimic_filtered_ia, label=r'$i_a(kM_d\dot\Delta t_1)$' + 'pós filtro mímico', color='blue',
+             marker='o', markersize=3, markerfacecolor='blue')
+axis[0].plot(new_time_points, phasor_ia.amplitude[:2301], label=r'$|I_a|$', color='red')
 axis[0].set_title('Corrente na fase A do Emissor')
 axis[0].set_xlabel('Tempo (s)')
 axis[0].set_ylabel('Corrente (A)')
