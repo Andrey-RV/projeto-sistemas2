@@ -29,7 +29,7 @@ class PhasorEstimator:
             signal: Uma sequência de amostras que compõe o sinal.
             samples_per_cycle: a quantidade de amostras de sinal por ciclo do sinal.
         '''
-        self.signal = signal
+        self.signal = signal.reshape(-1,)
         self.fourier_filter = FourierFilter(samples_per_cycle)
 
     def estimate(self):
