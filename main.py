@@ -75,9 +75,6 @@ mimic_filter_ia.apply_filter()
 mimic_filtered_va = mimic_filter_va.filtered_signal
 mimic_filtered_ia = mimic_filter_ia.filtered_signal
 
-print(np.mean(resampled_va), np.mean(mimic_filtered_va))
-print(np.mean(resampled_ia), np.mean(mimic_filtered_ia))
-
 # Figura representando va e ia reamostrados e o sinal filtrado pelo filtro mímico.
 figure, axis = plt.subplots(2, 1)
 axis[0].plot(new_time_points, resampled_va, label=r'$v_a(kM_d\dot\Delta t_1)$', color='blue',
@@ -141,3 +138,28 @@ axis[1].set_ylabel('Fase (graus)')
 axis[1].legend()
 axis[1].grid()
 plt.show()
+
+# # Densidade espectral de potência e média dos sinais.
+# figure, axis = plt.subplots(2, 1)
+# axis[0].psd(resampled_va.flatten(), NFFT=2048, Fs=1/new_sampling_period, label=r'$v_a(kM_d\dot\Delta t_1)$')
+# axis[0].psd(mimic_filtered_va.flatten(), NFFT=2048, Fs=1/new_sampling_period, label=r'$v_a(kM_d\dot\Delta t_1)$ pós filtro mímico')
+# axis[0].set_title('Densidade Espectral de Potência da Tensão na Fase A do Emissor')
+# axis[0].set_xlabel('Frequência (Hz)')
+# axis[0].set_ylabel('Potência (dB)')
+# axis[0].grid()
+# axis[0].legend()
+# axis[1].psd(resampled_ia.flatten(), NFFT=2048, Fs=1/new_sampling_period, label=r'$i_a(kM_d\dot\Delta t_1)$')
+# axis[1].psd(mimic_filtered_ia.flatten(), NFFT=2048, Fs=1/new_sampling_period, label=r'$i_a(kM_d\dot\Delta t_1)$ pós filtro mímico')
+# axis[1].set_title('Densidade Espectral de Potência da Corrente na Fase A do Emissor')
+# axis[1].set_xlabel('Frequência (Hz)')
+# axis[1].set_ylabel('Potência (dB)')
+# axis[1].grid()
+# axis[1].legend()
+# plt.show()
+
+# print(f'''
+#       Va pré filtro mímico: {np.mean(resampled_va)}
+#       Va pós filtro mímico: {np.mean(mimic_filtered_va)}
+#       Ia pré filtro mímico: {np.mean(resampled_ia)}
+#       Ia pós filtro mímico: {np.mean(mimic_filtered_ia)}
+#       ''')
