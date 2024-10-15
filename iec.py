@@ -1,7 +1,27 @@
 import numpy as np
-from anti_aliasing import AntiAliasingFilter
-from mimic_filter import MimicFilter
-from fourier_filter import PhasorEstimator
+from filters import AntiAliasingFilter, FourierFilter, MimicFilter
+
+
+class PhasorEstimator:
+    def __init__(self, signal, samples_per_cycle):
+        '''
+        Instancia um estimador de fasor.
+        Attributes:
+            signal: Uma sequência de amostras que compõe o sinal.
+            samples_per_cycle: a quantidade de amostras de sinal por ciclo do sinal.
+        '''
+        self.signal = signal.reshape(-1,)
+        self.fourier_filter = FourierFilter(samples_per_cycle)
+
+    def estimate(self):
+        '''
+        Estima um fasor utilizando a convolução do sinal com os filtros de Fourier cosseno e seno.
+        '''
+        self.real_part = np.convolve(self.signal, self.fourier_filter.cosine_filter)
+        self.imaginary_part = np.convolve(self.signal, self.fourier_filter.sine_filter)
+        self.amplitude = np.sqrt(self.real_part**2 + self.imaginary_part**2)
+        phase_rad = np.arctan2(self.imaginary_part, self.real_part)
+        self.phase = np.degrees(phase_rad)
 
 
 class Iec:
