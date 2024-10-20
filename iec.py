@@ -59,24 +59,24 @@ class Iec:
         self.estimator_samples_per_cycle = estimator_samples_per_cycle
         self.RTC = RTC
         self.frequency = frequency
-        self.apply_anti_aliasing_filter()
-        self.resample()
-        self.apply_mimic_filter()
-        self.estimate_phasors()
+        self._apply_anti_aliasing_filter()
+        self._resample()
+        self._apply_mimic_filter()
+        self._estimate_phasors()
 
-    def apply_anti_aliasing_filter(self):
+    def _apply_anti_aliasing_filter(self):
         for signal in self.signals:
             anti_aliasing_filter = AntiAliasingFilter(self.sampling_period, self.signals[signal], self.b, self.c)
             anti_aliasing_filter.apply_filter()
             self.signals[signal] = anti_aliasing_filter.filtered_signal
 
-    def resample(self):
+    def _resample(self):
         for signal in self.signals:
             self.signals[signal] = self.signals[signal][::self.md].reshape(-1)
         self.time = np.array(self.time[::self.md]).reshape(-1)
         self.sampling_period = self.time[1] - self.time[0]
 
-    def apply_mimic_filter(self):
+    def _apply_mimic_filter(self):
         inductance = self.XL / (2 * np.pi * self.frequency)
         tau = (inductance / self.R) / self.sampling_period
         for signal in self.signals:
@@ -84,7 +84,7 @@ class Iec:
             mimic_filter.apply_filter()
             self.signals[signal] = mimic_filter.filtered_signal
 
-    def estimate_phasors(self):
+    def _estimate_phasors(self):
         self.phasors = {
             'va': PhasorEstimator(self.signals['va'], self.estimator_samples_per_cycle, len(self.time)),
             'vb': PhasorEstimator(self.signals['vb'], self.estimator_samples_per_cycle, len(self.time)),
@@ -125,35 +125,56 @@ class Iec:
                 i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01  # Avoid division by zero
                 curve_common_term = gamma * (k / (((i_t[0] / self.RTC) / adjust_current) ** a - 1) + c)
                 trip_times[current] = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
-            self.trip_time_51F = {current: np.min(trip_times[current]) for current in trip_times}
+            self.min_time_51F = {current: np.min(trip_times[current]) for current in ['ia', 'ib', 'ic']}
 
         elif type == 'neutral':
             k = self.curves_params[curve]['k']
             a = self.curves_params[curve]['a']
             c = self.curves_params[curve]['c']
-            trip_time = np.array([])
+            trip_times = np.array([])
 
             i_t = (self.phasors['i0'].amplitude, self.time)
             i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01
             curve_common_term = gamma * (k / (((i_t[0] / self.RTC) / adjust_current) ** a - 1) + c)
-            trip_time = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
-            self.trip_time_51N = np.min(trip_time)
+            trip_times = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
+            self.min_time_51N = np.min(trip_times)
 
     def add_50(self, type, adjust_current):
         if type == 'phase':
-            trip_times = {'ia': np.array([]), 'ib': np.array([]), 'ic': np.array([])}
+            relays_trip_times = {'a': np.array([]),
+                                 'b': np.array([]),
+                                 'c': np.array([]),
+                                 'b\'': np.array([]),
+                                 'c\'': np.array([]),
+                                 'd\'': np.array([])}
+
+            trip_times = {'ia': relays_trip_times.copy(),
+                          'ib': relays_trip_times.copy(),
+                          'ic': relays_trip_times.copy()}
+
+            self.min_time_50F = {'ia': np.inf, 'ib': np.inf, 'ic': np.inf}
+
             for current in ['ia', 'ib', 'ic']:
-                i_t = (self.phasors[current].amplitude, self.time)
-                i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01
-                trip_times[current] = np.where(i_t[0] <= adjust_current, np.inf, i_t[1])
-            self.trip_time_50F = {current: np.min(trip_times[current]) for current in trip_times}
+                for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']:
+                    i_t = (self.phasors[current].amplitude, self.time)
+                    i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01
+                    trip_times[current][relay] = np.where(i_t[0] <= adjust_current[relay], np.inf, i_t[1])
+                    curr_relay_min_time = np.min(trip_times[current][relay])
+                    if curr_relay_min_time < self.min_time_50F[current]:
+                        self.min_time_50F[current] = curr_relay_min_time
 
         elif type == 'neutral':
-            trip_time = np.array([])
-            i_t = (self.phasors['i0'].amplitude, self.time)
-            i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01
-            trip_time = np.where(i_t[0] <= adjust_current, np.inf, i_t[1])
-            self.trip_time_50N = np.min(trip_time)
+            trip_times = {'a': np.array([]),
+                          'b': np.array([]),
+                          'c': np.array([]),
+                          'b\'': np.array([]),
+                          'c\'': np.array([]),
+                          'd\'': np.array([])}
+            for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']:
+                i_t = (self.phasors['i0'].amplitude, self.time)
+                i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01
+                trip_times[relay] = np.where(i_t[0] <= adjust_current[relay], np.inf, i_t[1])
+            self.min_time_50N = min([np.min(trip_times[relay]) for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']])
 
     def add_32(self, type, alpha, beta):
         if type == 'phase':
@@ -167,20 +188,25 @@ class Iec:
                     'b': np.degrees(np.angle(self.phasors['vc'].complex - self.phasors['va'].complex)),
                     'c': np.degrees(np.angle(self.phasors['va'].complex - self.phasors['vb'].complex)),
                 }
+
                 i_op_phases = {
-                    'a': self.phasors['ia'].phase,
-                    'b': self.phasors['ib'].phase,
-                    'c': self.phasors['ic'].phase,
+                    'a': self._replace_after_transitions(self.phasors['ia'].phase, 0),
+                    'b': self._replace_after_transitions(self.phasors['ib'].phase, 0),
+                    'c': self._replace_after_transitions(self.phasors['ic'].phase, 0),
                 }
+
                 op_region = {
                     'a': (v_pol_phases['a'] - 90 + beta, v_pol_phases['a'] + 90 + beta),
                     'b': (v_pol_phases['b'] - 90 + beta, v_pol_phases['b'] + 90 + beta),
                     'c': (v_pol_phases['c'] - 90 + beta, v_pol_phases['c'] + 90 + beta),
                 }
                 self.trip_permission_32F = {
-                    'a': (i_op_phases['a'] > op_region['a'][0]) & (i_op_phases['a'] < op_region['a'][1]),
-                    'b': (i_op_phases['b'] > op_region['b'][0]) & (i_op_phases['b'] < op_region['b'][1]),
-                    'c': (i_op_phases['c'] > op_region['c'][0]) & (i_op_phases['c'] < op_region['c'][1]),
+                    'a': ((i_op_phases['a'] > op_region['a'][0]) | np.isnan(i_op_phases['a'])) &
+                         ((i_op_phases['a'] < op_region['a'][1]) | np.isnan(i_op_phases['a'])),
+                    'b': ((i_op_phases['b'] > op_region['b'][0]) | np.isnan(i_op_phases['b'])) &
+                         ((i_op_phases['b'] < op_region['b'][1]) | np.isnan(i_op_phases['b'])),
+                    'c': ((i_op_phases['c'] > op_region['c'][0]) | np.isnan(i_op_phases['c'])) &
+                         ((i_op_phases['c'] < op_region['c'][1]) | np.isnan(i_op_phases['c'])),
                 }
 
         elif type == 'neutral':
@@ -189,7 +215,59 @@ class Iec:
             elif alpha == 60:
                 pass
             elif alpha == 90:
-                v_pol_phases = self.phasors['v0'].phase
-                i_op_phases = self.phasors['i0'].phase
-                op_region = (v_pol_phases - 90 + beta, v_pol_phases + 90 + beta)
-                self.trip_permission_32N = (i_op_phases >= op_region[0]) & (i_op_phases <= op_region[1])
+                v_pol_phases = -self.phasors['v0'].phase
+                i_op_phases = self._replace_after_transitions(self.phasors['i0'].phase, 0)
+                op_region = (-v_pol_phases - 90 + beta, -v_pol_phases + 90 + beta)
+                self.trip_permission_32N = ((i_op_phases > op_region[0]) | np.isnan(i_op_phases)) & \
+                                           ((i_op_phases < op_region[1]) | np.isnan(i_op_phases))
+
+    def add_67(self, type, gamma, timed_adjust_current, insta_adjust_current, curve):
+        if type == 'phase':
+            self.add_51(type='phase', gamma=gamma, adjust_current=timed_adjust_current, curve=curve)
+            self.add_50(type='phase', adjust_current=insta_adjust_current)
+            self.add_32(type='phase', alpha=90, beta=30)
+            self.logical_state_51F = {
+                'ia': [0 if t < self.min_time_51F['ia'] else 1 for t in self.time],
+                'ib': [0 if t < self.min_time_51F['ib'] else 1 for t in self.time],
+                'ic': [0 if t < self.min_time_51F['ic'] else 1 for t in self.time],
+            }
+            self.logical_state_50F = {
+                'ia': [0 if t < self.min_time_50F['ia'] else 1 for t in self.time],
+                'ib': [0 if t < self.min_time_50F['ib'] else 1 for t in self.time],
+                'ic': [0 if t < self.min_time_50F['ic'] else 1 for t in self.time],
+            }
+            self.trip_permission_67F = {
+                'a': ((self.logical_state_51F['ia'] & self.trip_permission_32F['a']) |
+                      (self.logical_state_50F['ia'] & self.trip_permission_32F['a'])),
+                'b': ((self.logical_state_51F['ib'] & self.trip_permission_32F['b']) |
+                      (self.logical_state_50F['ib'] & self.trip_permission_32F['b'])),
+                'c': ((self.logical_state_51F['ic'] & self.trip_permission_32F['c']) |
+                      (self.logical_state_50F['ic'] & self.trip_permission_32F['c'])),
+            }
+
+        elif type == 'neutral':
+            self.add_51(type='neutral', gamma=gamma, adjust_current=timed_adjust_current, curve=curve)
+            self.add_50(type='neutral', adjust_current=insta_adjust_current)
+            self.add_32(type='neutral', alpha=90, beta=30)
+            self.logical_state_51N = [0 if t < self.min_time_51N else 1 for t in self.time]
+            self.logical_state_50N = [0 if t < self.min_time_50N else 1 for t in self.time]
+            self.trip_permission_67N = ((self.logical_state_51N & self.trip_permission_32N) |
+                                        (self.logical_state_50N & self.trip_permission_32N))
+
+    @property
+    def trip_signal(self):
+        return (self.trip_permission_67F['a'] | self.trip_permission_67F['b'] |
+                self.trip_permission_67F['c'] | self.trip_permission_67N)
+
+    def _replace_after_transitions(self, arr, n):
+        arr = np.array(arr, dtype=float)
+        length = len(arr)
+
+        for i in range(length - 1):
+            if arr[i] > 0 and arr[i + 1] < 0:
+                start_index = max(i - n + 1, 0)
+                arr[start_index:i + 1] = np.nan
+
+                end_index = min(i + 1 + n, length)
+                arr[i + 1:end_index] = np.nan
+        return arr
