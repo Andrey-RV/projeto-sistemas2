@@ -6,7 +6,7 @@ class PhasorEstimator:
     def __init__(self, signal, samples_per_cycle, num_points):
         '''
         Instancia um estimador de fasor.
-        Attributes:
+        Args:
             signal: Uma sequência de amostras que compõe o sinal.
             samples_per_cycle: a quantidade de amostras de sinal por ciclo do sinal.
         '''
@@ -26,7 +26,7 @@ class PhasorEstimator:
         self.complex = self.amplitude * np.exp(1j * phase_rad)
 
 
-class Iec:
+class Ied:
     curves_params = {
         'IEC_normal_inverse': {'k': 0.14, 'a': 0.02, 'c': 0},
         'IEC_very_inverse': {'k': 13.5, 'a': 1, 'c': 0},
@@ -41,6 +41,26 @@ class Iec:
 
     def __init__(self, va, vb, vc, ia, ib, ic, t, sampling_period, b, c, md,
                  R, XL, estimator_samples_per_cycle, RTC, frequency=60):
+        '''
+        Instancia um objeto Ied.
+        Args:
+            va: Sinal de tensão fase A.
+            vb: Sinal de tensão fase B.
+            vc: Sinal de tensão fase C.
+            ia: Sinal de corrente fase A.
+            ib: Sinal de corrente fase B.
+            ic: Sinal de corrente fase C.
+            t: Vetor de tempo.
+            sampling_period: Período de amostragem.
+            b: Parâmetro do filtro de antialiasing.
+            c: Parâmetro do filtro de antialiasing.
+            md: Fator de downsampling.
+            R: Resistência do circuito.
+            XL: Reatância indutiva do circuito.
+            estimator_samples_per_cycle: Número de amostras por ciclo para o estimador de fasores.
+            RTC: Relação de transformação de corrente.
+            frequency: Frequência da rede elétrica.
+        '''
         self.signals = {
             'va': va,
             'vb': vb,
@@ -65,18 +85,27 @@ class Iec:
         self._estimate_phasors()
 
     def _apply_anti_aliasing_filter(self):
+        '''
+        Aplica um filtro de antialiasing aos sinais de tensão e corrente.
+        '''
         for signal in self.signals:
             anti_aliasing_filter = AntiAliasingFilter(self.sampling_period, self.signals[signal], self.b, self.c)
             anti_aliasing_filter.apply_filter()
             self.signals[signal] = anti_aliasing_filter.filtered_signal
 
     def _resample(self):
+        '''
+        Realiza o downsampling dos sinais de tensão e corrente.
+        '''
         for signal in self.signals:
             self.signals[signal] = self.signals[signal][::self.md].reshape(-1)
         self.time = np.array(self.time[::self.md]).reshape(-1)
         self.sampling_period = self.time[1] - self.time[0]
 
     def _apply_mimic_filter(self):
+        '''
+        Aplica o filtro mímico aos sinais de tensão e corrente.
+        '''
         inductance = self.XL / (2 * np.pi * self.frequency)
         tau = (inductance / self.R) / self.sampling_period
         for signal in self.signals:
@@ -85,6 +114,9 @@ class Iec:
             self.signals[signal] = mimic_filter.filtered_signal
 
     def _estimate_phasors(self):
+        '''
+        Estima os fasores de tensão e corrente.
+        '''
         self.phasors = {
             'va': PhasorEstimator(self.signals['va'], self.estimator_samples_per_cycle, len(self.time)),
             'vb': PhasorEstimator(self.signals['vb'], self.estimator_samples_per_cycle, len(self.time)),
@@ -114,6 +146,14 @@ class Iec:
                 self.phasors[signal].estimate()
 
     def add_51(self, type, gamma, adjust_current, curve):
+        '''
+        Adiciona um elemento de proteção 51 ao sistema.
+        Args:
+            type: O tipo do elemento de proteção (fase ou neutro).
+            gamma: O multiplicador do tempo de ajuste do relé 51.
+            adjust_current: A corrente de ajuste do relé 51.
+            curve: A curva do relé 51.
+        '''
         if type == 'phase':
             k = self.curves_params[curve]['k']
             a = self.curves_params[curve]['a']
@@ -122,7 +162,7 @@ class Iec:
 
             for current in ['ia', 'ib', 'ic']:
                 i_t = (self.phasors[current].amplitude, self.time)
-                i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01  # Avoid division by zero
+                i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01  # Evita divisão por zero
                 curve_common_term = gamma * (k / (((i_t[0] / self.RTC) / adjust_current) ** a - 1) + c)
                 trip_times[current] = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
             self.min_time_51F = {current: np.min(trip_times[current]) for current in ['ia', 'ib', 'ic']}
@@ -140,6 +180,12 @@ class Iec:
             self.min_time_51N = np.min(trip_times)
 
     def add_50(self, type, adjust_current):
+        '''
+        Adiciona um elemento de proteção 50 ao sistema.
+        Args:
+            type: O tipo do elemento de proteção (fase ou neutro).
+            adjust_current: A corrente de ajuste do relé 50.
+        '''
         if type == 'phase':
             relays_trip_times = {'a': np.array([]),
                                  'b': np.array([]),
@@ -157,7 +203,7 @@ class Iec:
             for current in ['ia', 'ib', 'ic']:
                 for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']:
                     i_t = (self.phasors[current].amplitude, self.time)
-                    i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01
+                    i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01  # Evita divisão por zero
                     trip_times[current][relay] = np.where(i_t[0] <= adjust_current[relay], np.inf, i_t[1])
                     curr_relay_min_time = np.min(trip_times[current][relay])
                     if curr_relay_min_time < self.min_time_50F[current]:
@@ -177,6 +223,13 @@ class Iec:
             self.min_time_50N = min([np.min(trip_times[relay]) for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']])
 
     def add_32(self, type, alpha, beta):
+        '''
+        Adiciona um elemento de proteção 32 ao sistema.
+        Args:
+            type: O tipo do elemento de proteção (fase ou neutro).
+            alpha: O ângulo de ajuste do relé 32.
+            beta: O ângulo de máximo torque do relé 32.
+        '''
         if type == 'phase':
             if alpha == 30:
                 pass
@@ -222,6 +275,15 @@ class Iec:
                                            ((i_op_phases < op_region[1]) | np.isnan(i_op_phases))
 
     def add_67(self, type, gamma, timed_adjust_current, insta_adjust_current, curve):
+        '''
+        Adiciona um elemento de proteção 67 ao sistema.
+        Args:
+            type: O tipo do elemento de proteção (fase ou neutro).
+            gamma: O multiplicador do tempo de ajuste do relé 51.
+            timed_adjust_current: A corrente de ajuste do relé 51.
+            insta_adjust_current: A corrente de ajuste do relé 50.
+            curve: A curva do relé 51.
+        '''
         if type == 'phase':
             self.add_51(type='phase', gamma=gamma, adjust_current=timed_adjust_current, curve=curve)
             self.add_50(type='phase', adjust_current=insta_adjust_current)
@@ -256,10 +318,16 @@ class Iec:
 
     @property
     def trip_signal(self):
+        '''
+        Retorna o sinal de disparo do IED
+        '''
         return (self.trip_permission_67F['a'] | self.trip_permission_67F['b'] |
                 self.trip_permission_67F['c'] | self.trip_permission_67N)
 
     def _replace_after_transitions(self, arr, n):
+        '''
+        Substitui n amostras após uma transição + -> - por NaN.
+        '''
         arr = np.array(arr, dtype=float)
         length = len(arr)
 

@@ -5,7 +5,7 @@ class AntiAliasingFilter():
     def __init__(self, period, signal, b, c):
         '''
         Instancia um filtro de anti-aliasing.
-        Attributes:
+        Args:
             signal: Uma sequência de amostras que compõe o sinal.
             period: A diferença de tempo entre as amostras.
             b: Parâmetro b
@@ -43,7 +43,7 @@ class FourierFilter:
     def __init__(self, samples_per_cycle):
         '''
         Instancia um filtro de fourier contendo os filtros cosseno e seno.
-        Attributes:
+        Args:
             samples_per_cycle: a quantidade de amostras de sinal por ciclo do sinal.
         '''
         self.samples_per_cycle = samples_per_cycle
@@ -61,11 +61,22 @@ class FourierFilter:
 
 class MimicFilter:
     def __init__(self, signal, tau, sample_period):
+        '''
+        Instancia um filtro mímico cujo objetivo é a remoção da componente CC do sinal.
+        Args:
+            signal: Uma sequência de amostras que compõe o sinal.
+            tau: Constante de tempo da rede.
+            sample_period: Período de amostragem do sinal.
+        '''
         self.signal = signal
         self.tau = tau
         self.sample_period = sample_period
 
     def apply_filter(self):
+        '''
+        Aplica o filtro mímico ao sinal de entrada via
+        xout(n) = k * [(1 + tau) * xin(n) - tau * xin(n-1)]
+        '''
         num_samples = len(self.signal)
         self.k = 1 / np.sqrt((1 + self.tau - self.tau * np.cos(120*np.pi * self.sample_period))**2 +
                              (self.tau * np.sin(120*np.pi * self.sample_period))**2)
