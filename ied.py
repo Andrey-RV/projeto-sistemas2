@@ -3,15 +3,15 @@ from filters import AntiAliasingFilter, FourierFilter, MimicFilter
 
 
 class PhasorEstimator:
-    def __init__(self, signal, samples_per_cycle, num_points):
+    def __init__(self, signal, sample_rate, num_points):
         '''
         Instancia um estimador de fasor.
         Args:
             signal: Uma sequência de amostras que compõe o sinal.
-            samples_per_cycle: a quantidade de amostras de sinal por ciclo do sinal.
+            sample_rate: a quantidade de amostras de sinal por ciclo do sinal.
         '''
         self.signal = signal.reshape(-1,)
-        self.fourier_filter = FourierFilter(samples_per_cycle)
+        self.fourier_filter = FourierFilter(sample_rate)
         self.num_points = num_points
 
     def estimate(self):
@@ -40,7 +40,7 @@ class Ied:
     }
 
     def __init__(self, va, vb, vc, ia, ib, ic, t, sampling_period, b, c, md,
-                 R, XL, estimator_samples_per_cycle, RTC, frequency=60):
+                 R, XL, estimator_sample_rate, RTC, frequency=60):
         '''
         Instancia um objeto Ied.
         Args:
@@ -57,7 +57,7 @@ class Ied:
             md: Fator de downsampling.
             R: Resistência do circuito.
             XL: Reatância indutiva do circuito.
-            estimator_samples_per_cycle: Número de amostras por ciclo para o estimador de fasores.
+            estimator_sample_rate: Número de amostras por ciclo para o estimador de fasores.
             RTC: Relação de transformação de corrente.
             frequency: Frequência da rede elétrica.
         '''
@@ -76,7 +76,7 @@ class Ied:
         self.md = int(md)
         self.R = R
         self.XL = XL
-        self.estimator_samples_per_cycle = estimator_samples_per_cycle
+        self.estimator_sample_rate = estimator_sample_rate
         self.RTC = RTC
         self.frequency = frequency
         self._apply_anti_aliasing_filter()
@@ -118,14 +118,14 @@ class Ied:
         Estima os fasores de tensão e corrente.
         '''
         self.phasors = {
-            'va': PhasorEstimator(self.signals['va'], self.estimator_samples_per_cycle, len(self.time)),
-            'vb': PhasorEstimator(self.signals['vb'], self.estimator_samples_per_cycle, len(self.time)),
-            'vc': PhasorEstimator(self.signals['vc'], self.estimator_samples_per_cycle, len(self.time)),
-            'v0': PhasorEstimator(np.zeros_like(self.signals['va']), self.estimator_samples_per_cycle, len(self.time)),
-            'ia': PhasorEstimator(self.signals['ia'], self.estimator_samples_per_cycle, len(self.time)),
-            'ib': PhasorEstimator(self.signals['ib'], self.estimator_samples_per_cycle, len(self.time)),
-            'ic': PhasorEstimator(self.signals['ic'], self.estimator_samples_per_cycle, len(self.time)),
-            'i0': PhasorEstimator(np.zeros_like(self.signals['ia']), self.estimator_samples_per_cycle, len(self.time)),
+            'va': PhasorEstimator(self.signals['va'], self.estimator_sample_rate, len(self.time)),
+            'vb': PhasorEstimator(self.signals['vb'], self.estimator_sample_rate, len(self.time)),
+            'vc': PhasorEstimator(self.signals['vc'], self.estimator_sample_rate, len(self.time)),
+            'v0': PhasorEstimator(np.zeros_like(self.signals['va']), self.estimator_sample_rate, len(self.time)),
+            'ia': PhasorEstimator(self.signals['ia'], self.estimator_sample_rate, len(self.time)),
+            'ib': PhasorEstimator(self.signals['ib'], self.estimator_sample_rate, len(self.time)),
+            'ic': PhasorEstimator(self.signals['ic'], self.estimator_sample_rate, len(self.time)),
+            'i0': PhasorEstimator(np.zeros_like(self.signals['ia']), self.estimator_sample_rate, len(self.time)),
         }
         for signal in self.phasors:
             if signal == 'v0':

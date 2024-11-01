@@ -5,7 +5,7 @@ from ied import Ied
 
 # Declaração de constantes
 FUNDAMENTAL_PERIOD = 1 / 60
-DESIRED_SAMPLES_PER_CYCLE = 16
+DESIRED_SAMPLE_RATE = 16
 R = 0.0246 * 250
 XL = 0.3219 * 250
 
@@ -18,7 +18,7 @@ for fault in range(1, 3):
 
 # Cálculo do período de amostragem e do fator de decimação
 sampling_period = signals['bus2_fault1']['t'][1] - signals['bus2_fault1']['t'][0]
-md = FUNDAMENTAL_PERIOD / (DESIRED_SAMPLES_PER_CYCLE * sampling_period)
+md = FUNDAMENTAL_PERIOD / (DESIRED_SAMPLE_RATE * sampling_period)
 
 # Declaração das correntes de ajuste dos relés
 phase_timed_adjust_current = 3
@@ -39,7 +39,7 @@ def create_ied(bus, fault):
         t=signals[f'bus{bus}_fault{fault}']['t'],
         sampling_period=sampling_period,
         b=1.599e3, c=1.279e6, md=md, R=R, XL=XL,
-        estimator_samples_per_cycle=16, RTC=1
+        estimator_sample_rate=16, RTC=1
     )
     return ied
 

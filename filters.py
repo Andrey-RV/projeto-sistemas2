@@ -40,13 +40,13 @@ class AntiAliasingFilter():
 
 
 class FourierFilter:
-    def __init__(self, samples_per_cycle):
+    def __init__(self, sample_rate):
         '''
         Instancia um filtro de fourier contendo os filtros cosseno e seno.
         Args:
-            samples_per_cycle: a quantidade de amostras de sinal por ciclo do sinal.
+            sample_rate: a quantidade de amostras de sinal por ciclo do sinal.
         '''
-        self.samples_per_cycle = samples_per_cycle
+        self.sample_rate = sample_rate
         self.create_filter()
 
     def create_filter(self):
@@ -54,9 +54,9 @@ class FourierFilter:
         Cria os filtros cosseno e seno de Fourier de período completo
         '''
         # Gera N argumentos espaçados entre (2.k.pi/N) e 2.pi
-        filter_args = np.linspace((2*np.pi / self.samples_per_cycle), 2*np.pi, self.samples_per_cycle)
-        self.cosine_filter = ((2 / self.samples_per_cycle) * np.cos(filter_args))
-        self.sine_filter = ((2 / self.samples_per_cycle) * np.sin(filter_args))
+        filter_args = np.linspace((2*np.pi / self.sample_rate), 2*np.pi, self.sample_rate)
+        self.cosine_filter = ((2 / self.sample_rate) * np.cos(filter_args))
+        self.sine_filter = ((2 / self.sample_rate) * np.sin(filter_args))
 
 
 class MimicFilter:
