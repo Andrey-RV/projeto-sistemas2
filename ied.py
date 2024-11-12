@@ -127,23 +127,18 @@ class Ied:
             'ic': PhasorEstimator(self.signals['ic'], self.estimator_sample_rate, len(self.time)),
             'i0': PhasorEstimator(np.zeros_like(self.signals['ia']), self.estimator_sample_rate, len(self.time)),
         }
+
         for signal in self.phasors:
-            if signal == 'v0':
-                self.phasors['v0'].amplitude = abs(
-                    self.phasors['va'].complex + self.phasors['vb'].complex + self.phasors['vc'].complex
-                )
-                self.phasors['v0'].phase = np.degrees(
-                    np.angle(self.phasors['va'].complex + self.phasors['vb'].complex + self.phasors['vc'].complex)
-                )
-            elif signal == 'i0':
-                self.phasors['i0'].amplitude = abs(
-                    self.phasors['ia'].complex + self.phasors['ib'].complex + self.phasors['ic'].complex
-                )
-                self.phasors['i0'].phase = np.degrees(
-                    np.angle(self.phasors['ia'].complex + self.phasors['ib'].complex + self.phasors['ic'].complex)
-                )
-            else:
+            if signal not in ['v0', 'i0']:
                 self.phasors[signal].estimate()
+
+        self.phasors['v0'].amplitude = abs(self.phasors['va'].complex + self.phasors['vb'].complex + self.phasors['vc'].complex)
+        self.phasors['v0'].phase = np.degrees(np.angle(self.phasors['va'].complex + self.phasors['vb'].complex
+                                                       + self.phasors['vc'].complex))
+
+        self.phasors['i0'].amplitude = abs(self.phasors['ia'].complex + self.phasors['ib'].complex + self.phasors['ic'].complex)
+        self.phasors['i0'].phase = np.degrees(np.angle(self.phasors['ia'].complex + self.phasors['ib'].complex +
+                                                       self.phasors['ic'].complex))
 
     def add_51(self, type, gamma, adjust_current, curve):
         '''
@@ -315,6 +310,32 @@ class Ied:
             self.logical_state_50N = [0 if t < self.min_time_50N else 1 for t in self.time]
             self.trip_permission_67N = ((self.logical_state_51N & self.trip_permission_32N) |
                                         (self.logical_state_50N & self.trip_permission_32N))
+
+    def add_21(self, inclination_angle, line_impedances, zones_coverage):
+        op_signal = {
+            'AT': {'zone1': None, 'zone2': None, 'zone3': None},
+            'BT': {'zone1': None, 'zone2': None, 'zone3': None},
+            'CT': {'zone1': None, 'zone2': None, 'zone3': None},
+            'AB': {'zone1': None, 'zone2': None, 'zone3': None},
+            'BC': {'zone1': None, 'zone2': None, 'zone3': None},
+            'CA': {'zone1': None, 'zone2': None, 'zone3': None},
+        }
+
+        zone1_impedance = line_impedances[0] * zones_coverage[0]
+        zone2_impedance = line_impedances[0] + line_impedances[1] * zones_coverage[1]
+        zone3_impedance = line_impedances[0] + line_impedances[1] + line_impedances[2] * zones_coverage[2]
+
+        self._calculate_AT_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
+        self._calculate_BT_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
+        self._calculate_CT_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
+        self._calculate_AB_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
+        self._calculate_BC_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
+        self._calculate_CA_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
+
+
+    def _calculate_AT_impedances(self, op_signal, zone_impedances):
+        for zone in ['zone1', 'zone2', 'zone3']:
+            op_signal['AT'][zone] = np.abs(zone_impedances[0])
 
     @property
     def trip_signal(self):
