@@ -132,10 +132,12 @@ class Ied:
             if signal not in ['v0', 'i0']:
                 self.phasors[signal].estimate()
 
+        self.phasors['v0'].complex = (self.phasors['va'].complex + self.phasors['vb'].complex + self.phasors['vc'].complex)
         self.phasors['v0'].amplitude = abs(self.phasors['va'].complex + self.phasors['vb'].complex + self.phasors['vc'].complex)
         self.phasors['v0'].phase = np.degrees(np.angle(self.phasors['va'].complex + self.phasors['vb'].complex
                                                        + self.phasors['vc'].complex))
 
+        self.phasors['i0'].complex = (self.phasors['ia'].complex + self.phasors['ib'].complex + self.phasors['ic'].complex)
         self.phasors['i0'].amplitude = abs(self.phasors['ia'].complex + self.phasors['ib'].complex + self.phasors['ic'].complex)
         self.phasors['i0'].phase = np.degrees(np.angle(self.phasors['ia'].complex + self.phasors['ib'].complex +
                                                        self.phasors['ic'].complex))
@@ -311,31 +313,45 @@ class Ied:
             self.trip_permission_67N = ((self.logical_state_51N & self.trip_permission_32N) |
                                         (self.logical_state_50N & self.trip_permission_32N))
 
-    def add_21(self, inclination_angle, line_impedances, zones_coverage):
-        op_signal = {
-            'AT': {'zone1': None, 'zone2': None, 'zone3': None},
-            'BT': {'zone1': None, 'zone2': None, 'zone3': None},
-            'CT': {'zone1': None, 'zone2': None, 'zone3': None},
-            'AB': {'zone1': None, 'zone2': None, 'zone3': None},
-            'BC': {'zone1': None, 'zone2': None, 'zone3': None},
-            'CA': {'zone1': None, 'zone2': None, 'zone3': None},
+    def add_21(self, inclination_angle, zones_impedances, line_z1, line_z0):
+        self.distance_trip_signals = {
+            'at': {'zone1': None, 'zone2': None, 'zone3': None},
+            'bt': {'zone1': None, 'zone2': None, 'zone3': None},
+            'ct': {'zone1': None, 'zone2': None, 'zone3': None},
+            'ab': {'zone1': None, 'zone2': None, 'zone3': None},
+            'bc': {'zone1': None, 'zone2': None, 'zone3': None},
+            'ca': {'zone1': None, 'zone2': None, 'zone3': None},
         }
+        self.measured_impedances = {'at': None, 'bt': None, 'ct': None, 'ab': {}, 'bc': {}, 'ca': {}}
 
-        zone1_impedance = line_impedances[0] * zones_coverage[0]
-        zone2_impedance = line_impedances[0] + line_impedances[1] * zones_coverage[1]
-        zone3_impedance = line_impedances[0] + line_impedances[1] + line_impedances[2] * zones_coverage[2]
+        s_op = {'at': {}, 'bt': {}, 'ct': {}, 'ab': {}, 'bc': {}, 'ca': {}}
 
-        self._calculate_AT_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
-        self._calculate_BT_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
-        self._calculate_CT_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
-        self._calculate_AB_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
-        self._calculate_BC_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
-        self._calculate_CA_impedances(op_signal, zone1_impedance, zone2_impedance, zone3_impedance)
+        impedance = {'zone1': zones_impedances[0], 'zone2': zones_impedances[1], 'zone3': zones_impedances[2]}
+        k = (line_z0 - line_z1) / line_z1
 
+        for unit in ['at', 'bt', 'ct', 'ab', 'bc', 'ca']:
+            if unit in ['at', 'bt', 'ct']:
+                vr = self.phasors['v' + unit[0]].complex[16:]
+                ir = self.phasors['i' + unit[0]].complex[16:] + k * (1/3) * self.phasors['i0'].complex[16:]
+                self.measured_impedances[unit] = vr / ir
+                v_pol = 'bc' if unit == 'at' else 'ca' if unit == 'bt' else 'ab'
+                s_pol = 1j * self.phasors['v' + v_pol[0]].complex[16:] - self.phasors['v' + v_pol[1]].complex[16:]
 
-    def _calculate_AT_impedances(self, op_signal, zone_impedances):
-        for zone in ['zone1', 'zone2', 'zone3']:
-            op_signal['AT'][zone] = np.abs(zone_impedances[0])
+            if unit in ['ab', 'bc', 'ca']:
+                ir = self.phasors['i' + unit[0]].complex[16:] - self.phasors['i' + unit[1]].complex[16:]
+                vr = self.phasors['v' + unit[0]].complex[16:] - self.phasors['v' + unit[1]].complex[16:]
+                self.measured_impedances[unit] = vr / ir
+                v_pol = 'c' if unit == 'ab' else 'a' if unit == 'bc' else 'b'
+                s_pol = -1j * self.phasors['v' + v_pol].complex[16:]
+
+            for zone in ['zone1', 'zone2', 'zone3']:
+                s_op[unit][zone] = (
+                    np.abs(impedance[zone]) * (np.cos(inclination_angle) + 1j * np.sin(inclination_angle)) * ir - vr
+                )
+
+                cos_comparator = np.real(s_op[unit][zone] * np.conj(s_pol))
+                normalized_cos_comparator = cos_comparator / (np.abs(cos_comparator) + 1e-15)
+                self.distance_trip_signals[unit][zone] = np.where(normalized_cos_comparator >= 0.99, 1, 0)
 
     @property
     def trip_signal(self):
