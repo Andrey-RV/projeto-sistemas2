@@ -67,7 +67,7 @@ def add_function_21(ied: Ied, inclination_angle, zones_impedances, z1, z0):
     return
 
 
-def add_67(ied: Ied, gamma_phase, gamma_neutral):
+def add_function_67(ied: Ied, gamma_phase, gamma_neutral):
     ied.add_67(type='phase', gamma=gamma_phase, timed_adjust_current=PHASE_TIMED_ADJUST_CURRENT,
                insta_adjust_current=PHASE_INSTA_ADJUST_CURRENT, curve='IEEE_moderately_inverse')
     ied.add_67(type='neutral', gamma=gamma_neutral, timed_adjust_current=NEUTRAL_TIMED_ADJUST_CURRENT,
@@ -132,42 +132,45 @@ def plot_part2(ied: Ied, title, resample_limit=0.7):
     plt.show()
 
 
-# Criação dos IEDs para cada barramento e falta, adição dos relés 67 e 21
+# Segundo estágio: criação dos IEDs para cada barramento e falta, adição dos relés 67
 for bus in range(2, 4):
     gamma_phase = 0.069 if bus == 2 else 0.173  # multiplicadores de tempo para as unidades 51F
     gamma_neutral = 0.240 if bus == 2 else 0.312  # multiplicadores de tempo para as unidades 51N
 
     for fault in range(1, 3):
         ied = create_ied(bus, fault)
-        add_67(ied, gamma_phase, gamma_neutral)
-        # plot_part1(ied, f'Bus {bus} Fault {fault}')
-        # plot_part2(ied, f'Bus {bus} Fault {fault}')
-        add_function_21(ied, INCLINATION_ANGLE, [0.85 * z1, 1.5 * z1, 2 * z1], z1, z0)
+        add_function_67(ied, gamma_phase, gamma_neutral)
+        plot_part1(ied, f'Bus {bus} Fault {fault}')
+        plot_part2(ied, f'Bus {bus} Fault {fault}')
 
-        # Plot das zonas de proteção e trajetórias das impedâncias
+# Terceiro estágio: criação dos IEDs para cada barramento e falta, adição dos relés 21
+for bus in range(2, 4):
+    for fault in range(1, 3):
+        ied = create_ied(bus, fault)
+        add_function_21(ied, INCLINATION_ANGLE, [0.85 * z1, 1.5 * z1, 2 * z1], z1, z0)
         for unit in ['at', 'bt', 'ct', 'ab', 'bc', 'ca']:
             dx = np.diff(np.real(ied.measured_impedances[unit]))
             dy = np.diff(np.imag(ied.measured_impedances[unit]))
-        fig, ax = plt.subplots()
-        ax.set_xlim(-4, 4)
-        ax.set_ylim(-4, 4)
-        ax.set_aspect('equal', adjustable='datalim')
-        ax.scatter(np.real(ied.measured_impedances[unit]), np.imag(ied.measured_impedances[unit]), color='black', s=15)
-        ax.plot(np.real(ied.measured_impedances[unit]), np.imag(ied.measured_impedances[unit]), color='black', linestyle='--')
-        ax.quiver(np.real(ied.measured_impedances[unit])[:-1], np.imag(ied.measured_impedances[unit])[:-1], dx, dy,
-                  angles='xy', scale_units='xy', scale=1, color='black', width=0.004)
-        ax.title.set_text(f'Barra {bus}, Falta {fault}, Unidade {unit.upper()}')
+            fig, ax = plt.subplots()
+            ax.set_xlim(-4, 4)
+            ax.set_ylim(-4, 4)
+            ax.set_aspect('equal', adjustable='datalim')
+            ax.scatter(np.real(ied.measured_impedances[unit]), np.imag(ied.measured_impedances[unit]), color='black', s=15)
+            ax.plot(np.real(ied.measured_impedances[unit]), np.imag(ied.measured_impedances[unit]), color='black', linestyle='--')
+            ax.quiver(np.real(ied.measured_impedances[unit])[:-1], np.imag(ied.measured_impedances[unit])[:-1], dx, dy,
+                    angles='xy', scale_units='xy', scale=1, color='black', width=0.004)
+            ax.title.set_text(f'Barra {bus}, Falta {fault}, Unidade {unit.upper()}')
 
-        zone1_circle = plt.Circle((ZONE1C[0], ZONE1C[1]), ZONE1C[2], color='blue', fill=False, label='Zona 1')
-        ax.add_artist(zone1_circle)
-        zone2_circle = plt.Circle((ZONE2C[0], ZONE2C[1]), ZONE2C[2], color='green', fill=False, label='Zona 2')
-        ax.add_artist(zone2_circle)
-        zone3_circle = plt.Circle((ZONE3C[0], ZONE3C[1]), ZONE3C[2], color='red', fill=False, label='Zona 3')
-        ax.add_artist(zone3_circle)
-        ax.title.set_text(f'Unidade {unit.upper()} na Barra {bus}')
+            zone1_circle = plt.Circle((ZONE1C[0], ZONE1C[1]), ZONE1C[2], color='blue', fill=False, label='Zona 1')
+            ax.add_artist(zone1_circle)
+            zone2_circle = plt.Circle((ZONE2C[0], ZONE2C[1]), ZONE2C[2], color='green', fill=False, label='Zona 2')
+            ax.add_artist(zone2_circle)
+            zone3_circle = plt.Circle((ZONE3C[0], ZONE3C[1]), ZONE3C[2], color='red', fill=False, label='Zona 3')
+            ax.add_artist(zone3_circle)
+            ax.title.set_text(f'Unidade {unit.upper()} na Barra {bus}')
 
-        plt.legend()
-        plt.show()
+            plt.legend()
+            plt.show()
 
         # Cálculo das impedâncias e distâncias observadas pelas unidades 21
         real_impedance = ied.measured_impedances[unit][-1] * ((500e3/115) / (300 / 5))
