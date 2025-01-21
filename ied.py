@@ -1,70 +1,36 @@
 import numpy as np
 from typing import Sequence
-from scipy.signal import fftconvolve
-from filters import AntiAliasingFilter, FourierFilter, MimicFilter
-
-
-class PhasorEstimator:
-    def __init__(self, signal: Sequence[float], sample_rate: float, num_points: int) -> None:
-        '''
-        Instancia um estimador de fasor.
-        Args:
-            signal: Uma sequência de amostras que compõe o sinal.
-            sample_rate: a quantidade de amostras de sinal por ciclo do sinal.
-        '''
-        self.signal = np.array(signal).reshape(-1,)
-        self.fourier_filters = FourierFilter(sample_rate)
-        self.num_points = num_points
-
-    def estimate(self) -> None:
-        '''
-        Estima um fasor utilizando a convolução do sinal com os filtros de Fourier cosseno e seno.
-        '''
-        self.phasor_real = fftconvolve(self.signal, self.fourier_filters.cosine_filter, mode='same')
-        self.phasor_imaginary = fftconvolve(self.signal, self.fourier_filters.sine_filter, mode='same')
-        self.amplitude = np.sqrt(self.phasor_real**2 + self.phasor_imaginary**2)
-        print(len(self.signal))
-        print(len(self.amplitude))
-        exit()
-        phase_rad = np.arctan2(self.phasor_imaginary, self.phasor_real)[:self.num_points]
-        self.phase = np.degrees(phase_rad)
-        self.complex = self.amplitude * np.exp(1j * phase_rad)
+from phasor_estimator import PhasorEstimator
+from filters import AntiAliasingFilter, MimicFilter
+from curves import Curve
 
 
 class Ied:
-    curves_params = {
-        'IEC_normal_inverse': {'k': 0.14, 'a': 0.02, 'c': 0},
-        'IEC_very_inverse': {'k': 13.5, 'a': 1, 'c': 0},
-        'IEC_extremely_inverse': {'k': 80, 'a': 2, 'c': 0},
-        'UK_long_time_inverse': {'k': 120, 'a': 1, 'c': 0},
-        'IEEE_moderately_inverse': {'k': 0.0515, 'a': 0.02, 'c': 0.114},
-        'IEEE_very_inverse': {'k': 19.61, 'a': 2, 'c': 0.491},
-        'IEEE_extremely_inverse': {'k': 28.2, 'a': 2, 'c': 0.1217},
-        'US_CO8_inverse': {'k': 5.95, 'a': 2, 'c': 0.18},
-        'US_CO2_short_time_inverse': {'k': 0.02394, 'a': 0.02, 'c': 0.01694},
-    }
-
-    def __init__(self, va, vb, vc, ia, ib, ic, t, sampling_period, b, c, md,
-                 R, XL, estimator_sample_rate, RTC, frequency=60):
+    def __init__(self, va: Sequence[float], vb: Sequence[float], vc: Sequence[float],
+                 ia: Sequence[float], ib: Sequence[float], ic: Sequence[float],
+                 t: Sequence[float], sampling_period: float,
+                 b: float, c: float, md: int,
+                 R: float, XL: float,
+                 estimator_sample_rate: int, RTC: int, frequency: int = 60):
         '''
         Instancia um objeto Ied.
         Args:
-            va: Sinal de tensão fase A.
-            vb: Sinal de tensão fase B.
-            vc: Sinal de tensão fase C.
-            ia: Sinal de corrente fase A.
-            ib: Sinal de corrente fase B.
-            ic: Sinal de corrente fase C.
-            t: Vetor de tempo.
-            sampling_period: Período de amostragem.
-            b: Parâmetro do filtro de antialiasing.
-            c: Parâmetro do filtro de antialiasing.
-            md: Fator de downsampling.
-            R: Resistência do circuito.
-            XL: Reatância indutiva do circuito.
-            estimator_sample_rate: Número de amostras por ciclo para o estimador de fasores.
-            RTC: Relação de transformação de corrente.
-            frequency: Frequência da rede elétrica.
+            va (Sequence[float]): Sinal de tensão fase A.
+            vb (Sequence[float]): Sinal de tensão fase B.
+            vc (Sequence[float]): Sinal de tensão fase C.
+            ia (Sequence[float]): Sinal de corrente fase A.
+            ib (Sequence[float]): Sinal de corrente fase B.
+            ic (Sequence[float]): Sinal de corrente fase C.
+            t (Sequence[float]): Vetor de tempo.
+            sampling_period (float): Período de amostragem.
+            b (float): Parâmetro do filtro de antialiasing.
+            c (float): Parâmetro do filtro de antialiasing.
+            md (int): Fator de downsampling.
+            R (float): Resistência do circuito.
+            XL (float): Reatância indutiva do circuito.
+            estimator_sample_rate (int): Número de amostras por ciclo para o estimador de fasores.
+            RTC (int): Relação de transformação de corrente.
+            frequency (int): Frequência da rede elétrica.
         '''
         self.signals = {
             'va': va,
@@ -78,7 +44,7 @@ class Ied:
         self.sampling_period = sampling_period
         self.b = b
         self.c = c
-        self.md = int(md)
+        self.md = md
         self.R = R
         self.XL = XL
         self.estimator_sample_rate = estimator_sample_rate
@@ -137,15 +103,15 @@ class Ied:
             if signal not in ['v0', 'i0']:
                 self.phasors[signal].estimate()
 
-        self.phasors['v0'].complex = (self.phasors['va'].complex + self.phasors['vb'].complex + self.phasors['vc'].complex)
-        self.phasors['v0'].amplitude = abs(self.phasors['va'].complex + self.phasors['vb'].complex + self.phasors['vc'].complex)
-        self.phasors['v0'].phase = np.degrees(np.angle(self.phasors['va'].complex + self.phasors['vb'].complex
-                                                       + self.phasors['vc'].complex))
+        self.phasors['v0'].exp_form = (self.phasors['va'].exp_form + self.phasors['vb'].exp_form + self.phasors['vc'].exp_form)
+        self.phasors['v0'].amplitude = abs(self.phasors['va'].exp_form + self.phasors['vb'].exp_form + self.phasors['vc'].exp_form)
+        self.phasors['v0'].phase = np.degrees(np.angle(self.phasors['va'].exp_form + self.phasors['vb'].exp_form
+                                                       + self.phasors['vc'].exp_form))
 
-        self.phasors['i0'].complex = (self.phasors['ia'].complex + self.phasors['ib'].complex + self.phasors['ic'].complex)
-        self.phasors['i0'].amplitude = abs(self.phasors['ia'].complex + self.phasors['ib'].complex + self.phasors['ic'].complex)
-        self.phasors['i0'].phase = np.degrees(np.angle(self.phasors['ia'].complex + self.phasors['ib'].complex +
-                                                       self.phasors['ic'].complex))
+        self.phasors['i0'].exp_form = (self.phasors['ia'].exp_form + self.phasors['ib'].exp_form + self.phasors['ic'].exp_form)
+        self.phasors['i0'].amplitude = abs(self.phasors['ia'].exp_form + self.phasors['ib'].exp_form + self.phasors['ic'].exp_form)
+        self.phasors['i0'].phase = np.degrees(np.angle(self.phasors['ia'].exp_form + self.phasors['ib'].exp_form +
+                                                       self.phasors['ic'].exp_form))
 
     def add_51(self, type, gamma, adjust_current, curve):
         '''
@@ -156,10 +122,9 @@ class Ied:
             adjust_current: A corrente de ajuste do relé 51.
             curve: A curva do relé 51.
         '''
+        (k, a, c) = Curve[curve.upper()].value
+
         if type == 'phase':
-            k = self.curves_params[curve]['k']
-            a = self.curves_params[curve]['a']
-            c = self.curves_params[curve]['c']
             trip_times = {'ia': np.array([]), 'ib': np.array([]), 'ic': np.array([])}
 
             for current in ['ia', 'ib', 'ic']:
@@ -170,9 +135,6 @@ class Ied:
             self.min_time_51F = {current: np.min(trip_times[current]) for current in ['ia', 'ib', 'ic']}
 
         elif type == 'neutral':
-            k = self.curves_params[curve]['k']
-            a = self.curves_params[curve]['a']
-            c = self.curves_params[curve]['c']
             trip_times = np.array([])
 
             i_t = (self.phasors['i0'].amplitude, self.time)
@@ -239,9 +201,9 @@ class Ied:
                 pass
             elif alpha == 90:
                 v_pol_phases = {
-                    'a': np.degrees(np.angle(self.phasors['vb'].complex - self.phasors['vc'].complex)),
-                    'b': np.degrees(np.angle(self.phasors['vc'].complex - self.phasors['va'].complex)),
-                    'c': np.degrees(np.angle(self.phasors['va'].complex - self.phasors['vb'].complex)),
+                    'a': np.degrees(np.angle(self.phasors['vb'].exp_form - self.phasors['vc'].exp_form)),
+                    'b': np.degrees(np.angle(self.phasors['vc'].exp_form - self.phasors['va'].exp_form)),
+                    'c': np.degrees(np.angle(self.phasors['va'].exp_form - self.phasors['vb'].exp_form)),
                 }
 
                 i_op_phases = {
@@ -336,18 +298,18 @@ class Ied:
 
         for unit in ['at', 'bt', 'ct', 'ab', 'bc', 'ca']:
             if unit in ['at', 'bt', 'ct']:
-                vr = self.phasors['v' + unit[0]].complex[16:]
-                ir = self.phasors['i' + unit[0]].complex[16:] + k * (1/3) * self.phasors['i0'].complex[16:]
+                vr = self.phasors['v' + unit[0]].exp_form[16:]
+                ir = self.phasors['i' + unit[0]].exp_form[16:] + k * (1/3) * self.phasors['i0'].exp_form[16:]
                 self.measured_impedances[unit] = vr / ir
                 v_pol = 'bc' if unit == 'at' else 'ca' if unit == 'bt' else 'ab'
-                s_pol = 1j * self.phasors['v' + v_pol[0]].complex[16:] - self.phasors['v' + v_pol[1]].complex[16:]
+                s_pol = 1j * self.phasors['v' + v_pol[0]].exp_form[16:] - self.phasors['v' + v_pol[1]].exp_form[16:]
 
             if unit in ['ab', 'bc', 'ca']:
-                ir = self.phasors['i' + unit[0]].complex[16:] - self.phasors['i' + unit[1]].complex[16:]
-                vr = self.phasors['v' + unit[0]].complex[16:] - self.phasors['v' + unit[1]].complex[16:]
+                ir = self.phasors['i' + unit[0]].exp_form[16:] - self.phasors['i' + unit[1]].exp_form[16:]
+                vr = self.phasors['v' + unit[0]].exp_form[16:] - self.phasors['v' + unit[1]].exp_form[16:]
                 self.measured_impedances[unit] = vr / ir
                 v_pol = 'c' if unit == 'ab' else 'a' if unit == 'bc' else 'b'
-                s_pol = -1j * self.phasors['v' + v_pol].complex[16:]
+                s_pol = -1j * self.phasors['v' + v_pol].exp_form[16:]
 
             for zone in ['zone1', 'zone2', 'zone3']:
                 s_op[unit][zone] = (
