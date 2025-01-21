@@ -14,7 +14,6 @@ class PhasorEstimator:
         '''
         self.signal = np.array(signal).reshape(-1,)
         self.fourier_filters = FourierFilter(sample_rate)
-        self.num_points = num_points
 
     def estimate(self) -> None:
         '''
