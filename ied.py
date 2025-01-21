@@ -1,5 +1,4 @@
 import numpy as np
-from typing import Sequence
 from phasor_estimator import PhasorEstimator
 from filters import AntiAliasingFilter, MimicFilter
 from curves import Curve
