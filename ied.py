@@ -3,26 +3,16 @@ from typing import Sequence
 from phasor_estimator import PhasorEstimator
 from filters import AntiAliasingFilter, MimicFilter
 from curves import Curve
+from signals import Signals
 
 
 class Ied:
-    def __init__(self, va: Sequence[float], vb: Sequence[float], vc: Sequence[float],
-                 ia: Sequence[float], ib: Sequence[float], ic: Sequence[float],
-                 t: Sequence[float], sampling_period: float,
-                 b: float, c: float, md: int,
-                 R: float, XL: float,
-                 estimator_sample_rate: int, RTC: int, frequency: int = 60):
+    def __init__(self, signals: Signals, b: float, c: float, md: int, R: float, XL: float,
+                 estimator_sample_rate: int, RTC: int, RTPC: int = 0, frequency: int = 60):
         '''
         Instancia um objeto Ied.
         Args:
-            va (Sequence[float]): Sinal de tensão fase A.
-            vb (Sequence[float]): Sinal de tensão fase B.
-            vc (Sequence[float]): Sinal de tensão fase C.
-            ia (Sequence[float]): Sinal de corrente fase A.
-            ib (Sequence[float]): Sinal de corrente fase B.
-            ic (Sequence[float]): Sinal de corrente fase C.
-            t (Sequence[float]): Vetor de tempo.
-            sampling_period (float): Período de amostragem.
+            signals (Signals): Um objeto contendo os sinais de tensão e corrente, vetor de tempo e período de amostragem.
             b (float): Parâmetro do filtro de antialiasing.
             c (float): Parâmetro do filtro de antialiasing.
             md (int): Fator de downsampling.
@@ -30,18 +20,10 @@ class Ied:
             XL (float): Reatância indutiva do circuito.
             estimator_sample_rate (int): Número de amostras por ciclo para o estimador de fasores.
             RTC (int): Relação de transformação de corrente.
+            RTPC (int): Relação de transformação de potencial capacitivo.
             frequency (int): Frequência da rede elétrica.
         '''
-        self.signals = {
-            'va': va,
-            'vb': vb,
-            'vc': vc,
-            'ia': ia,
-            'ib': ib,
-            'ic': ic
-        }
-        self.time = t
-        self.sampling_period = sampling_period
+        self.signals = signals
         self.b = b
         self.c = c
         self.md = md
@@ -59,44 +41,44 @@ class Ied:
         '''
         Aplica um filtro de antialiasing aos sinais de tensão e corrente.
         '''
-        for signal in self.signals:
-            anti_aliasing_filter = AntiAliasingFilter(self.sampling_period, self.signals[signal], self.b, self.c)
+        for signal_name, signal_data in self.signals:
+            anti_aliasing_filter = AntiAliasingFilter(self.signals.sampling_period, signal_data, self.b, self.c)
             anti_aliasing_filter.apply_filter()
-            self.signals[signal] = anti_aliasing_filter.filtered_signal
+            self.signals[signal_name] = anti_aliasing_filter.filtered_signal
 
     def _resample(self):
         '''
         Realiza o downsampling dos sinais de tensão e corrente.
         '''
-        for signal in self.signals:
-            self.signals[signal] = self.signals[signal][::self.md].reshape(-1)
-        self.time = np.array(self.time[::self.md]).reshape(-1)
-        self.sampling_period = self.time[1] - self.time[0]
+        for signal_name, signal_data in self.signals:
+            self.signals[signal_name] = np.array(signal_data[::self.md])
+        self.signals.t = np.array(self.signals.t[::self.md]).reshape(-1)
+        self.signals.sampling_period = self.signals.t[1] - self.signals.t[0]
 
     def _apply_mimic_filter(self):
         '''
         Aplica o filtro mímico aos sinais de tensão e corrente.
         '''
         inductance = self.XL / (2 * np.pi * self.frequency)
-        tau = (inductance / self.R) / self.sampling_period
-        for signal in self.signals:
-            mimic_filter = MimicFilter(self.signals[signal], tau, self.sampling_period)
+        tau = (inductance / self.R) / self.signals.sampling_period
+        for signal_name, signal_data in self.signals:
+            mimic_filter = MimicFilter(signal_data, tau, self.signals.sampling_period)
             mimic_filter.apply_filter()
-            self.signals[signal] = mimic_filter.filtered_signal
+            self.signals[signal_name] = mimic_filter.filtered_signal
 
     def _estimate_phasors(self):
         '''
         Estima os fasores de tensão e corrente.
         '''
         self.phasors = {
-            'va': PhasorEstimator(self.signals['va'], self.estimator_sample_rate, len(self.time)),
-            'vb': PhasorEstimator(self.signals['vb'], self.estimator_sample_rate, len(self.time)),
-            'vc': PhasorEstimator(self.signals['vc'], self.estimator_sample_rate, len(self.time)),
-            'v0': PhasorEstimator(np.zeros_like(self.signals['va']), self.estimator_sample_rate, len(self.time)),
-            'ia': PhasorEstimator(self.signals['ia'], self.estimator_sample_rate, len(self.time)),
-            'ib': PhasorEstimator(self.signals['ib'], self.estimator_sample_rate, len(self.time)),
-            'ic': PhasorEstimator(self.signals['ic'], self.estimator_sample_rate, len(self.time)),
-            'i0': PhasorEstimator(np.zeros_like(self.signals['ia']), self.estimator_sample_rate, len(self.time)),
+            'va': PhasorEstimator(self.signals.va, self.estimator_sample_rate, len(self.signals.t)),
+            'vb': PhasorEstimator(self.signals.vb, self.estimator_sample_rate, len(self.signals.t)),
+            'vc': PhasorEstimator(self.signals.vc, self.estimator_sample_rate, len(self.signals.t)),
+            'v0': PhasorEstimator(np.zeros_like(self.signals.va), self.estimator_sample_rate, len(self.signals.t)),
+            'ia': PhasorEstimator(self.signals.ia, self.estimator_sample_rate, len(self.signals.t)),
+            'ib': PhasorEstimator(self.signals.ib, self.estimator_sample_rate, len(self.signals.t)),
+            'ic': PhasorEstimator(self.signals.ic, self.estimator_sample_rate, len(self.signals.t)),
+            'i0': PhasorEstimator(np.zeros_like(self.signals.ia), self.estimator_sample_rate, len(self.signals.t)),
         }
 
         for signal in self.phasors:
@@ -128,7 +110,7 @@ class Ied:
             trip_times = {'ia': np.array([]), 'ib': np.array([]), 'ic': np.array([])}
 
             for current in ['ia', 'ib', 'ic']:
-                i_t = (self.phasors[current].amplitude, self.time)
+                i_t = (self.phasors[current].amplitude, self.signals.t)
                 i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01  # Evita divisão por zero
                 curve_common_term = gamma * (k / (((i_t[0] / self.RTC) / adjust_current) ** a - 1) + c)
                 trip_times[current] = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
@@ -137,7 +119,7 @@ class Ied:
         elif type == 'neutral':
             trip_times = np.array([])
 
-            i_t = (self.phasors['i0'].amplitude, self.time)
+            i_t = (self.phasors['i0'].amplitude, self.signals.t)
             i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01
             curve_common_term = gamma * (k / (((i_t[0] / self.RTC) / adjust_current) ** a - 1) + c)
             trip_times = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
@@ -166,7 +148,7 @@ class Ied:
 
             for current in ['ia', 'ib', 'ic']:
                 for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']:
-                    i_t = (self.phasors[current].amplitude, self.time)
+                    i_t = (self.phasors[current].amplitude, self.signals.t)
                     i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01  # Evita divisão por zero
                     trip_times[current][relay] = np.where(i_t[0] <= adjust_current[relay], np.inf, i_t[1])
                     curr_relay_min_time = np.min(trip_times[current][relay])
@@ -181,7 +163,7 @@ class Ied:
                           'c\'': np.array([]),
                           'd\'': np.array([])}
             for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']:
-                i_t = (self.phasors['i0'].amplitude, self.time)
+                i_t = (self.phasors['i0'].amplitude, self.signals.t)
                 i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01
                 trip_times[relay] = np.where(i_t[0] <= adjust_current[relay], np.inf, i_t[1])
             self.min_time_50N = min([np.min(trip_times[relay]) for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']])
@@ -253,14 +235,14 @@ class Ied:
             self.add_50(type='phase', adjust_current=insta_adjust_current)
             self.add_32(type='phase', alpha=90, beta=30)
             self.logical_state_51F = {
-                'ia': [0 if t < self.min_time_51F['ia'] else 1 for t in self.time],
-                'ib': [0 if t < self.min_time_51F['ib'] else 1 for t in self.time],
-                'ic': [0 if t < self.min_time_51F['ic'] else 1 for t in self.time],
+                'ia': [0 if t < self.min_time_51F['ia'] else 1 for t in self.signals.t],
+                'ib': [0 if t < self.min_time_51F['ib'] else 1 for t in self.signals.t],
+                'ic': [0 if t < self.min_time_51F['ic'] else 1 for t in self.signals.t],
             }
             self.logical_state_50F = {
-                'ia': [0 if t < self.min_time_50F['ia'] else 1 for t in self.time],
-                'ib': [0 if t < self.min_time_50F['ib'] else 1 for t in self.time],
-                'ic': [0 if t < self.min_time_50F['ic'] else 1 for t in self.time],
+                'ia': [0 if t < self.min_time_50F['ia'] else 1 for t in self.signals.t],
+                'ib': [0 if t < self.min_time_50F['ib'] else 1 for t in self.signals.t],
+                'ic': [0 if t < self.min_time_50F['ic'] else 1 for t in self.signals.t],
             }
             self.trip_permission_67F = {
                 'a': ((self.logical_state_51F['ia'] & self.trip_permission_32F['a']) |
@@ -275,8 +257,8 @@ class Ied:
             self.add_51(type='neutral', gamma=gamma, adjust_current=timed_adjust_current, curve=curve)
             self.add_50(type='neutral', adjust_current=insta_adjust_current)
             self.add_32(type='neutral', alpha=90, beta=30)
-            self.logical_state_51N = [0 if t < self.min_time_51N else 1 for t in self.time]
-            self.logical_state_50N = [0 if t < self.min_time_50N else 1 for t in self.time]
+            self.logical_state_51N = [0 if t < self.min_time_51N else 1 for t in self.signals.t]
+            self.logical_state_50N = [0 if t < self.min_time_50N else 1 for t in self.signals.t]
             self.trip_permission_67N = ((self.logical_state_51N & self.trip_permission_32N) |
                                         (self.logical_state_50N & self.trip_permission_32N))
 
