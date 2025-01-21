@@ -1,27 +1,32 @@
 import numpy as np
+from typing import Sequence
+from scipy.signal import fftconvolve
 from filters import AntiAliasingFilter, FourierFilter, MimicFilter
 
 
 class PhasorEstimator:
-    def __init__(self, signal, sample_rate, num_points):
+    def __init__(self, signal: Sequence[float], sample_rate: float, num_points: int) -> None:
         '''
         Instancia um estimador de fasor.
         Args:
             signal: Uma sequência de amostras que compõe o sinal.
             sample_rate: a quantidade de amostras de sinal por ciclo do sinal.
         '''
-        self.signal = signal.reshape(-1,)
-        self.fourier_filter = FourierFilter(sample_rate)
+        self.signal = np.array(signal).reshape(-1,)
+        self.fourier_filters = FourierFilter(sample_rate)
         self.num_points = num_points
 
-    def estimate(self):
+    def estimate(self) -> None:
         '''
         Estima um fasor utilizando a convolução do sinal com os filtros de Fourier cosseno e seno.
         '''
-        self.real_part = np.convolve(self.signal, self.fourier_filter.cosine_filter)
-        self.imaginary_part = np.convolve(self.signal, self.fourier_filter.sine_filter)
-        self.amplitude = np.sqrt(self.real_part**2 + self.imaginary_part**2)[:self.num_points]
-        phase_rad = np.arctan2(self.imaginary_part, self.real_part)[:self.num_points]
+        self.phasor_real = fftconvolve(self.signal, self.fourier_filters.cosine_filter, mode='same')
+        self.phasor_imaginary = fftconvolve(self.signal, self.fourier_filters.sine_filter, mode='same')
+        self.amplitude = np.sqrt(self.phasor_real**2 + self.phasor_imaginary**2)
+        print(len(self.signal))
+        print(len(self.amplitude))
+        exit()
+        phase_rad = np.arctan2(self.phasor_imaginary, self.phasor_real)[:self.num_points]
         self.phase = np.degrees(phase_rad)
         self.complex = self.amplitude * np.exp(1j * phase_rad)
 
