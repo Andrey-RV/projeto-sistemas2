@@ -1,4 +1,5 @@
-/venv
+/.venv
 /__pycache__
 /Registros
+output.txt
 LEIAME.txt
