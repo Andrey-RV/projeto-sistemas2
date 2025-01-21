@@ -20,9 +20,9 @@ class PhasorEstimator:
         '''
         Estima um fasor utilizando a convolução do sinal com os filtros de Fourier cosseno e seno.
         '''
-        self.real = fftconvolve(self.signal, self.fourier_filters.cosine_filter, mode='same')
-        self.imaginary = fftconvolve(self.signal, self.fourier_filters.sine_filter, mode='same')
-        rect_form = self.real + 1j * self.imaginary
+        real = fftconvolve(self.signal, self.fourier_filters.cosine_filter, mode='same')
+        imaginary = fftconvolve(self.signal, self.fourier_filters.sine_filter, mode='same')
+        rect_form = real + 1j * imaginary
         self.amplitude = np.abs(rect_form)
         self.phase = np.degrees(np.angle(rect_form))
         self.exp_form = self.amplitude * np.exp(1j * np.radians(self.phase))
