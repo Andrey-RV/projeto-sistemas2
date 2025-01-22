@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.typing as npt
+from typing import Generator
 from dataclasses import dataclass
 
 
@@ -40,7 +41,7 @@ class Signals:
         self.ic = np.array(self.ic)
         self.t = np.array(self.t)
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[tuple[str, npt.NDArray[np.float64]], None, None]:
         """Itera os atributos do objeto em forma de tuplas ('nome', valor).
 
         Yields:
@@ -53,5 +54,5 @@ class Signals:
         yield 'ib', self.ib
         yield 'ic', self.ic
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         setattr(self, key, value)
