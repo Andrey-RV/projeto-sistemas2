@@ -9,23 +9,23 @@ class Signals:
     """Armazena um conjunto de sinais e tensões trifásicas, além do vetor de tempo e o período de amostragem.
 
     Yields:
-        va (npt.NDArray[np.float64]): Tensão fase A.
-        vb (npt.NDArray[np.float64]): Tensão fase B.
-        vc (npt.NDArray[np.float64]): Tensão fase C.
-        ia (npt.NDArray[np.float64]): Corrente fase A.
-        ib (npt.NDArray[np.float64]): Corrente fase B.
-        ic (npt.NDArray[np.float64]): Corrente fase C.
-        t (npt.NDArray[np.float64]): Vetor de tempo.
-        sampling_period (float): Período de amostragem.
+        va (npt.NDArray[np.float64]): Tensão fase A. Default: np.array([]).
+        vb (npt.NDArray[np.float64]): Tensão fase B. Default: np.array([]).
+        vc (npt.NDArray[np.float64]): Tensão fase C. Default: np.array([]).
+        ia (npt.NDArray[np.float64]): Corrente fase A. Default: np.array([]).
+        ib (npt.NDArray[np.float64]): Corrente fase B. Default: np.array([]).
+        ic (npt.NDArray[np.float64]): Corrente fase C. Default: np.array([]).
+        t (npt.NDArray[np.float64]): Vetor de tempo. Default: np.array([]).
+        sampling_period (float): Período de amostragem. Default: np.nan.
     """
-    va: npt.NDArray[np.float64]
-    vb: npt.NDArray[np.float64]
-    vc: npt.NDArray[np.float64]
-    ia: npt.NDArray[np.float64]
-    ib: npt.NDArray[np.float64]
-    ic: npt.NDArray[np.float64]
-    t: npt.NDArray[np.float64]
-    sampling_period: float
+    va: npt.NDArray[np.float64] = np.array([])
+    vb: npt.NDArray[np.float64] = np.array([])
+    vc: npt.NDArray[np.float64] = np.array([])
+    ia: npt.NDArray[np.float64] = np.array([])
+    ib: npt.NDArray[np.float64] = np.array([])
+    ic: npt.NDArray[np.float64] = np.array([])
+    t: npt.NDArray[np.float64] = np.array([])
+    sampling_period: float = np.nan
 
     def __post_init__(self) -> None:
         """Certifica-se de que todos os atributos são do tipo np.ndarray.
