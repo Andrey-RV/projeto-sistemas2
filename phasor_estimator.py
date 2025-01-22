@@ -1,15 +1,15 @@
-from typing import Sequence
 from scipy.signal import fftconvolve  # type: ignore
 from filters import FourierFilter
 import numpy as np
+import numpy.typing as npt
 
 
 class PhasorEstimator:
-    def __init__(self, signal: Sequence[float], samples_per_cycle: int) -> None:
+    def __init__(self, signal: npt.NDArray[np.float64], samples_per_cycle: int) -> None:
         '''
         Instancia um estimador de fasor.
         Args:
-            signal (Sequence[float]): o sinal a ser estimado.
+            signal (npt.NDArray[np.float64]): o sinal a ser estimado.
             samples_per_cycle (int): A quantidade de amostras capturadas pelo IED em um período da onda fundamental.
 
         Returns:
