@@ -1,19 +1,37 @@
 import numpy as np
+import numpy.typing as npt
 from dataclasses import dataclass
 
 
 @dataclass
 class Signals:
-    va: np.ndarray
-    vb: np.ndarray
-    vc: np.ndarray
-    ia: np.ndarray
-    ib: np.ndarray
-    ic: np.ndarray
-    t: np.ndarray
+    """Armazena um conjunto de sinais e tensões trifásicas, além do vetor de tempo e o período de amostragem.
+
+    Yields:
+        va (npt.NDArray[np.float64]): Tensão fase A.
+        vb (npt.NDArray[np.float64]): Tensão fase B.
+        vc (npt.NDArray[np.float64]): Tensão fase C.
+        ia (npt.NDArray[np.float64]): Corrente fase A.
+        ib (npt.NDArray[np.float64]): Corrente fase B.
+        ic (npt.NDArray[np.float64]): Corrente fase C.
+        t (npt.NDArray[np.float64]): Vetor de tempo.
+        sampling_period (float): Período de amostragem.
+    """
+    va: npt.NDArray[np.float64]
+    vb: npt.NDArray[np.float64]
+    vc: npt.NDArray[np.float64]
+    ia: npt.NDArray[np.float64]
+    ib: npt.NDArray[np.float64]
+    ic: npt.NDArray[np.float64]
+    t: npt.NDArray[np.float64]
     sampling_period: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Certifica-se de que todos os atributos são do tipo np.ndarray.
+
+        Returns:
+            None
+        """
         self.va = np.array(self.va)
         self.vb = np.array(self.vb)
         self.vc = np.array(self.vc)
@@ -23,6 +41,11 @@ class Signals:
         self.t = np.array(self.t)
 
     def __iter__(self):
+        """Itera os atributos do objeto em forma de tuplas ('nome', valor).
+
+        Yields:
+            Tuple[str, npt.NDArray[np.float64]]: Tuplas contendo o nome do atributo e seu valor.
+        """
         yield 'va', self.va
         yield 'vb', self.vb
         yield 'vc', self.vc
