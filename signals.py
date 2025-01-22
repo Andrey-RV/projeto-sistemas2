@@ -46,6 +46,9 @@ class Signals:
 
         Yields:
             Tuple[str, npt.NDArray[np.float64]]: Tuplas contendo o nome do atributo e seu valor.
+
+        Returns:
+            Generator[tuple[str, npt.NDArray[np.float64]], None, None]
         """
         yield 'va', self.va
         yield 'vb', self.vb
