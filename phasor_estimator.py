@@ -5,19 +5,19 @@ import numpy as np
 
 
 class PhasorEstimator:
-    def __init__(self, signal: Sequence[float], sample_rate: float) -> None:
+    def __init__(self, signal: Sequence[float], samples_per_cycle: int) -> None:
         '''
         Instancia um estimador de fasor.
         Args:
             signal (Sequence[float]): o sinal a ser estimado.
-            sample_rate (float): a taxa de amostragem do sinal.
+            samples_per_cycle (int): A quantidade de amostras capturadas pelo IED em um período da onda fundamental.
 
         Returns:
             None
         '''
         self.__signal = np.array(signal)
-        self.__sample_rate = sample_rate
-        self.__fourier_filters = FourierFilter(self.__sample_rate)
+        self.__samples_per_cycle = samples_per_cycle
+        self.__fourier_filters = FourierFilter(self.__samples_per_cycle)
 
     def __repr__(self, verbose: bool = False) -> str:
         """Retorna uma representação do objeto em forma de string.
@@ -35,7 +35,7 @@ class PhasorEstimator:
         return (
             f"PhasorEstimator("
             f"{signal_repr}, "
-            f"sample_rate={self.__sample_rate}, "
+            f"samples_per_cycle={self.__samples_per_cycle}, "
             f"amplitude={'set' if hasattr(self, 'amplitude') else 'unset'}, "
             f"phase={'set' if hasattr(self, 'phase') else 'unset'})"
         )
