@@ -28,7 +28,7 @@ class Signals:
     sampling_period: float = np.nan
 
     def __post_init__(self) -> None:
-        """Certifica-se de que todos os atributos são do tipo np.ndarray.
+        """Certifica-se de que todos os sinais estão armazenados como arrays numpy.
 
         Returns:
             None
