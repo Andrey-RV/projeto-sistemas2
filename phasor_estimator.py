@@ -47,6 +47,7 @@ class PhasorEstimator:
         Returns:
             None
         '''
+        self.__fourier_filters.create_filter()
         real = fftconvolve(self.__signal, self.__fourier_filters.cosine_filter, mode='same')
         imaginary = fftconvolve(self.__signal, self.__fourier_filters.sine_filter, mode='same')
         rect_form = real + 1j * imaginary
