@@ -11,12 +11,23 @@ class PhasorEstimator:
         Args:
             signal (Sequence[float]): o sinal a ser estimado.
             sample_rate (float): a taxa de amostragem do sinal.
+
+        Returns:
+            None
         '''
-        self.__signal = np.array(signal).reshape(-1,)
+        self.__signal = np.array(signal)
         self.__sample_rate = sample_rate
         self.__fourier_filters = FourierFilter(self.__sample_rate)
 
     def __repr__(self, verbose: bool = False) -> str:
+        """Retorna uma representação do objeto em forma de string.
+
+        Args:
+            verbose (bool, optional): Seleciona se a representação conterá somente o shape e dtype do sinal ou parte do sinal em si. Defaults to False.
+
+        Returns:
+            str: Representação do objeto em forma de string.
+        """
         if verbose:
             signal_repr = f"signal={np.array2string(self.__signal, precision=3, threshold=5)}"
         else:
@@ -32,6 +43,9 @@ class PhasorEstimator:
     def estimate(self) -> None:
         '''
         Estima um fasor utilizando a convolução do sinal com os filtros de Fourier cosseno e seno.
+
+        Returns:
+            None
         '''
         real = fftconvolve(self.__signal, self.__fourier_filters.cosine_filter, mode='same')
         imaginary = fftconvolve(self.__signal, self.__fourier_filters.sine_filter, mode='same')
