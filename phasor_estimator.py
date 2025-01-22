@@ -15,6 +15,9 @@ class PhasorEstimator:
         self.signal = np.array(signal).reshape(-1,)
         self.fourier_filters = FourierFilter(sample_rate)
 
+    def __repr__(self) -> str:
+        return f'PhasorEstimator(signal={self.signal}, amplitude={self.amplitude}, phase={self.phase})'
+
     def estimate(self) -> None:
         '''
         Estima um fasor utilizando a convolução do sinal com os filtros de Fourier cosseno e seno.
