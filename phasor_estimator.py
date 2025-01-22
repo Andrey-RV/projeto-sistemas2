@@ -16,7 +16,7 @@ class PhasorEstimator:
         self.fourier_filters = FourierFilter(sample_rate)
 
     def __repr__(self) -> str:
-        return f'PhasorEstimator(signal={self.signal}, amplitude={self.amplitude}, phase={self.phase})'
+        return f'{type(self).__name__} \n Signal: {self.signal} \n Amplitude: {self.amplitude} \n Phase: {self.phase}'
 
     def estimate(self) -> None:
         '''
