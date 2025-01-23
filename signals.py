@@ -1,10 +1,11 @@
 import numpy as np
 import numpy.typing as npt
-from typing import Generator
+from typing import Union, Generator
+from pandas import Series  # type: ignore
 from dataclasses import dataclass, field
 
 
-numeric_array = npt.NDArray[np.float64 | np.complex128]
+numeric_array = Union[npt.NDArray[np.float64 | np.complex128], Series]
 name_value_pair = tuple[str, numeric_array]
 
 
@@ -13,13 +14,13 @@ class Signals:
     """Armazena um conjunto de sinais e tensões trifásicas, além do vetor de tempo e o período de amostragem.
 
     Yields:
-        va (npt.NDArray[np.float64 | np.complex128]): Tensão fase A.
-        vb (npt.NDArray[np.float64 | np.complex128]): Tensão fase B.
-        vc (npt.NDArray[np.float64 | np.complex128]): Tensão fase C.
-        ia (npt.NDArray[np.float64 | np.complex128]): Corrente fase A.
-        ib (npt.NDArray[np.float64 | np.complex128]): Corrente fase B.
-        ic (npt.NDArray[np.float64 | np.complex128]): Corrente fase C.
-        t (npt.NDArray[np.float64 | np.complex128]): Vetor de tempo.
+        va (numeric_array): Tensão fase A.
+        vb (numeric_array): Tensão fase B.
+        vc (numeric_array): Tensão fase C.
+        ia (numeric_array): Corrente fase A.
+        ib (numeric_array): Corrente fase B.
+        ic (numeric_array): Corrente fase C.
+        t (numeric_array): Vetor de tempo.
         sampling_period (float): Período de amostragem.
     """
     va: numeric_array = field(default_factory=lambda: np.array([], dtype=np.float64))
