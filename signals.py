@@ -67,18 +67,3 @@ class Signals:
             npt.NDArray[np.float64 | np.complex128]: As correntes trifásicas.
         """
         return self.ia, self.ib, self.ic
-
-    def resample(self, decimation_factor: int) -> None:
-        """Realiza o resampling dos sinais de acordo com um novo período de amostragem.
-
-        Args:
-            decimation_factor (int): Fator de decimação.
-
-        Returns:
-            None
-        """
-        for name in ["va", "vb", "vc", "ia", "ib", "ic"]:
-            setattr(self, name, getattr(self, name)[::decimation_factor])
-
-        self.t = self.t[::decimation_factor]
-        self.sampling_period *= decimation_factor
