@@ -21,10 +21,10 @@ class PhasorEstimator:
     def __repr__(self) -> str:
         return (
             f"PhasorEstimator("
-            f"samples_per_cycle={self.__samples_per_cycle}, "
+            f"samples_per_cycle={self.__samples_per_cycle})"
         )
 
-    def estimate(self, signal: npt.NDArray[np.float64]) -> complex:
+    def estimate(self, signal: npt.NDArray[np.float64]) -> npt.NDArray[np.complex128]:
         '''
         Retorna a representação complexa do fasor estimado.
 
@@ -34,6 +34,6 @@ class PhasorEstimator:
         self.__fourier_filters.create_filter()
         real = fftconvolve(signal, self.__fourier_filters.cosine_filter, mode='same')
         imaginary = fftconvolve(signal, self.__fourier_filters.sine_filter, mode='same')
-        phasor = complex(real, imaginary)
 
+        phasor = real + 1j * imaginary
         return phasor
