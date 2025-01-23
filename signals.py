@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 
 numeric_array = npt.NDArray[np.float64 | np.complex128]
+name_value_pair = tuple[str, numeric_array]
 
 
 @dataclass
@@ -52,18 +53,18 @@ class Signals:
     def __getitem__(self, key) -> numeric_array:
         return getattr(self, key)
 
-    def get_voltage(self) -> tuple[numeric_array, numeric_array, numeric_array]:
+    def get_voltages(self) -> tuple[name_value_pair, name_value_pair, name_value_pair]:
         """Retorna as tensões trifásicas do objeto.
 
         Returns:
             npt.NDArray[np.float64 | np.complex128]: As tensões trifásicas.
         """
-        return self.va, self.vb, self.vc
+        return ('va', self.va), ('vb', self.vb), ('vc', self.vc)
 
-    def get_current(self) -> tuple[numeric_array, numeric_array, numeric_array]:
+    def get_currents(self) -> tuple[name_value_pair, name_value_pair, name_value_pair]:
         """Retorna as correntes trifásicas do objeto.
 
         Returns:
             npt.NDArray[np.float64 | np.complex128]: As correntes trifásicas.
         """
-        return self.ia, self.ib, self.ic
+        return ('ia', self.ia), ('ib', self.ib), ('ic', self.ic)
