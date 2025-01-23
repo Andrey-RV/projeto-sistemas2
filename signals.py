@@ -9,22 +9,22 @@ class Signals:
     """Armazena um conjunto de sinais e tensões trifásicas, além do vetor de tempo e o período de amostragem.
 
     Yields:
-        va (npt.NDArray[np.float64]): Tensão fase A. Default: np.array([]).
-        vb (npt.NDArray[np.float64]): Tensão fase B. Default: np.array([]).
-        vc (npt.NDArray[np.float64]): Tensão fase C. Default: np.array([]).
-        ia (npt.NDArray[np.float64]): Corrente fase A. Default: np.array([]).
-        ib (npt.NDArray[np.float64]): Corrente fase B. Default: np.array([]).
-        ic (npt.NDArray[np.float64]): Corrente fase C. Default: np.array([]).
-        t (npt.NDArray[np.float64]): Vetor de tempo. Default: np.array([]).
+        va (npt.NDArray[np.float64 | np.complex128]): Tensão fase A. Default: np.array([]).
+        vb (npt.NDArray[np.float64 | np.complex128]): Tensão fase B. Default: np.array([]).
+        vc (npt.NDArray[np.float64 | np.complex128]): Tensão fase C. Default: np.array([]).
+        ia (npt.NDArray[np.float64 | np.complex128]): Corrente fase A. Default: np.array([]).
+        ib (npt.NDArray[np.float64 | np.complex128]): Corrente fase B. Default: np.array([]).
+        ic (npt.NDArray[np.float64 | np.complex128]): Corrente fase C. Default: np.array([]).
+        t (npt.NDArray[np.float64 | np.complex128]): Vetor de tempo. Default: np.array([]).
         sampling_period (float): Período de amostragem. Default: np.nan.
     """
-    va: npt.NDArray[np.float64] = np.array([])
-    vb: npt.NDArray[np.float64] = np.array([])
-    vc: npt.NDArray[np.float64] = np.array([])
-    ia: npt.NDArray[np.float64] = np.array([])
-    ib: npt.NDArray[np.float64] = np.array([])
-    ic: npt.NDArray[np.float64] = np.array([])
-    t: npt.NDArray[np.float64] = np.array([])
+    va: npt.NDArray[np.float64 | np.complex128] = np.array([])
+    vb: npt.NDArray[np.float64 | np.complex128] = np.array([])
+    vc: npt.NDArray[np.float64 | np.complex128] = np.array([])
+    ia: npt.NDArray[np.float64 | np.complex128] = np.array([])
+    ib: npt.NDArray[np.float64 | np.complex128] = np.array([])
+    ic: npt.NDArray[np.float64 | np.complex128] = np.array([])
+    t: npt.NDArray[np.float64 | np.complex128] = np.array([])
     sampling_period: float = np.nan
 
     def __post_init__(self) -> None:
@@ -41,7 +41,7 @@ class Signals:
         self.ic = np.array(self.ic)
         self.t = np.array(self.t)
 
-    def __iter__(self) -> Generator[tuple[str, npt.NDArray[np.float64]], None, None]:
+    def __iter__(self) -> Generator[tuple[str, npt.NDArray[np.float64 | np.complex128]], None, None]:
         """Itera os atributos do objeto em forma de tuplas ('nome', valor).
 
         Yields:
@@ -59,3 +59,6 @@ class Signals:
 
     def __setitem__(self, key, value) -> None:
         setattr(self, key, value)
+
+    def __getitem__(self, key) -> npt.NDArray[np.float64]:
+        return getattr(self, key)
