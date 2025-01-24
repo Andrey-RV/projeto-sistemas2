@@ -1,12 +1,12 @@
 import numpy as np
 import numpy.typing as npt
-from typing import Union, Generator
+from typing import Union, Generator, TypeAlias
 from pandas import Series  # type: ignore
 from dataclasses import dataclass, field
 
 
-numeric_array = Union[npt.NDArray[np.float64 | np.complex128], Series]
-name_value_pair = tuple[str, numeric_array]
+numeric_array: TypeAlias = Union[npt.NDArray[np.float64 | np.complex128], Series]
+name_value_pair: TypeAlias = tuple[str, numeric_array]
 
 
 @dataclass
