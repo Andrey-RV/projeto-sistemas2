@@ -43,7 +43,7 @@ class AntiAliasingFilter:
         d1 = 2 * (self.__c - self.__a**2) / denominator
         d2 = (self.__a**2 + self.__c - self.__a*self.__b) / denominator
 
-        filtered_signal = np.zeros_like((len(signal)))
+        filtered_signal = np.zeros_like(signal)
         filtered_signal[0] = c0 * signal[0]
         filtered_signal[1] = c0 * signal[1] + c1 * signal[0] - d1 * filtered_signal[0]
 
@@ -131,7 +131,7 @@ class MimicFilter:
                 (self.__tau * np.sin(120*np.pi * self.__sampling_period))**2
             )
 
-        filtered_signal = np.zeros_like(len(signal))
+        filtered_signal = np.zeros_like(signal)
         filtered_signal[0] = self.k * (1 + self.__tau) * signal[0]
         for i in range(1, len(signal)):
             filtered_signal[i] = self.k * (
