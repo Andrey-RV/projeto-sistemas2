@@ -31,7 +31,8 @@ class AntiAliasingFilter:
 
             $$x_0 = c_0.x_0$$
             $$x_1 = c_0.x_1 + c_1.x_0 - d_1.x_0$$
-            $$ \x_{out}(n) = \left[c_0.x_{in}(n) + c_1.x_{in}(n-1) + c_2.x_{in}(n-2)\right] - \left[d_1.x_{out}(n-1) + d_2.x_{out}(n-2)right], \quad n \geq 2$$
+            $$ \x_{out}(n) = \left[c_0.x_{in}(n) + c_1.x_{in}(n-1) + c_2.x_{in}(n-2)\right] - \left[d_1.x_{out}(n-1)
+            + d_2.x_{out}(n-2)right], \quad n \geq 2$$
 
             Returns:
                 npt.NDArray[np.float64]: O sinal filtrado.
@@ -126,13 +127,14 @@ class MimicFilter:
         Returns:
             None
         '''
-        self.k = 1 / np.sqrt(
-                (1 + self.__tau - self.__tau * np.cos(120*np.pi * self.__sampling_period))**2 +
-                (self.__tau * np.sin(120*np.pi * self.__sampling_period))**2
-            )
+        cos_term = np.cos(120*np.pi * self.__sampling_period)
+        sine_term = np.sin(120*np.pi * self.__sampling_period)
+
+        self.k = 1 / np.sqrt((1 + self.__tau - self.__tau * cos_term)**2 + (self.__tau * sine_term)**2)
 
         filtered_signal = np.zeros_like(signal)
         filtered_signal[0] = self.k * (1 + self.__tau) * signal[0]
+
         for i in range(1, len(signal)):
             filtered_signal[i] = self.k * (
                 (1 + self.__tau) * signal[i] - self.__tau * signal[i-1]

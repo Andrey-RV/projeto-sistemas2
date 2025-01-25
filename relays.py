@@ -19,10 +19,10 @@ class _Relay32Base(ABC):
         raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
     def _trim_data(self, array, num_points_to_be_chopped):
-        '''Substitui n amostras após uma transição + -> - por NaN.'''
-        positive_values = (array[:-1] >= 0)  # [1, 2, -1, -2] -> [True, True, False]
-        negative_values = (array[1:] < 0)  # [1, 2, -1, -2] -> [False, True, True]
-        transitions = np.where(positive_values & negative_values)[0] + 1  # [True, True, False] & [False, True, True] -> [1] + 1 -> [2]
+        '''Substitui n amostras antes e n/2 amostras após uma transição + -> - por NaN.'''
+        positive_values = (array[:-1] >= 0)
+        negative_values = (array[1:] < 0)
+        transitions = np.where(positive_values & negative_values)[0] + 1
 
         for transition_index in transitions:
             start_index = max(transition_index - num_points_to_be_chopped, 0)  # Include points before
@@ -185,7 +185,12 @@ class PhaseRelay50(_Relay50Base):
 
 
 class NeutralRelay50(_Relay50Base):
-    def __init__(self, adjust_current: float, time_vector: npt.NDArray[np.float64], neutral_current: npt.NDArray[np.complex128]) -> None:
+    def __init__(
+        self,
+        adjust_current: float,
+        time_vector: npt.NDArray[np.float64],
+        neutral_current: npt.NDArray[np.complex128]
+    ) -> None:
         super().__init__(adjust_current, time_vector)
         self._neutral_current = neutral_current
 
@@ -223,12 +228,13 @@ class _Relay51Base(_OvercurrentRelayBase):
         Returns:
             npt.NDArray[np.float64]: O tempo de atuação do relé 51.
         """
-        secondary_current = np.where(
+        normalized_current = (np.where(  # Evita divisão por zero + normalização
             secondary_current == self._adjust_current,
             self._adjust_current + _Relay51Base.ADJUST_OFFSET,
             secondary_current)
+        ) / self._adjust_current
 
-        curve_common_term = self._gamma * (self._k / ((secondary_current / self._adjust_current) ** self._a - 1) + self._c)
+        curve_common_term = self._gamma * (self._k / ((normalized_current) ** self._a - 1) + self._c)
 
         trip_times = np.where(
             secondary_current <= self._adjust_current,
@@ -288,7 +294,11 @@ class NeutralRelay51(_Relay51Base):
 
 
 class _Relay67Base(ABC):
-    def __init__(self, trips: dict[str, dict[str, np.float64 | np.bool_]], time_vector: npt.NDArray[np.float64]) -> None:
+    def __init__(
+        self,
+        trips: dict[str, dict[str, np.float64 | np.bool_]],
+        time_vector: npt.NDArray[np.float64]
+    ) -> None:
         self._trips = trips
         self._time_vector = time_vector
 
@@ -303,7 +313,11 @@ class _Relay67Base(ABC):
 
 
 class PhaseRelay67(_Relay67Base):
-    def __init__(self, trips: dict[str, dict[str, np.float64 | np.bool_]], time_vector: npt.NDArray[np.float64]) -> None:
+    def __init__(
+        self,
+        trips: dict[str, dict[str, np.float64 | np.bool_]],
+        time_vector: npt.NDArray[np.float64]
+    ) -> None:
         super().__init__(trips, time_vector)
         self.__validate_trips()
 
@@ -331,7 +345,11 @@ class PhaseRelay67(_Relay67Base):
 
 
 class NeutralRelay67(_Relay67Base):
-    def __init__(self, trips: dict[str, dict[str, np.float64 | np.bool_]], time_vector: npt.NDArray[np.float64]) -> None:
+    def __init__(
+        self,
+        trips: dict[str, dict[str, np.float64 | np.bool_]],
+        time_vector: npt.NDArray[np.float64]
+    ) -> None:
         super().__init__(trips, time_vector)
         self.__validate_trips()
 
