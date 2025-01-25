@@ -3,7 +3,7 @@ import numpy.typing as npt
 from typing import Generator, TypeAlias
 from dataclasses import dataclass, field
 
-name_value_pair: TypeAlias = tuple[str, npt.NDArray[np.float64]]
+name_value_pair: TypeAlias = tuple[str, npt.NDArray[np.complex128]]
 
 
 @dataclass
@@ -20,12 +20,12 @@ class Signals:
         t (npt.NDArray[np.float64]): Vetor de tempo.
         sampling_period (float): Período de amostragem.
     """
-    va: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
-    vb: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
-    vc: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
-    ia: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
-    ib: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
-    ic: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    va: npt.NDArray[np.complex128] = field(default_factory=lambda: np.array([], dtype=np.complex128))
+    vb: npt.NDArray[np.complex128] = field(default_factory=lambda: np.array([], dtype=np.complex128))
+    vc: npt.NDArray[np.complex128] = field(default_factory=lambda: np.array([], dtype=np.complex128))
+    ia: npt.NDArray[np.complex128] = field(default_factory=lambda: np.array([], dtype=np.complex128))
+    ib: npt.NDArray[np.complex128] = field(default_factory=lambda: np.array([], dtype=np.complex128))
+    ic: npt.NDArray[np.complex128] = field(default_factory=lambda: np.array([], dtype=np.complex128))
     t: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
     sampling_period: float = field(default=np.nan)
 
