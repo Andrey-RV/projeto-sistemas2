@@ -1,326 +1,252 @@
 import numpy as np
+import relays
+from signals import Signals
 from phasor_estimator import PhasorEstimator
 from filters import AntiAliasingFilter, MimicFilter
-from curves import Curve
-from signals import Signals
 
 
 class Ied:
-    def __init__(self, signals: Signals, b: float, c: float, md: int, R: float, XL: float,
-                 estimator_sample_rate: int, RTC: int, RTPC: int = 0, frequency: int = 60):
-        '''
-        Instancia um objeto Ied.
+    def __init__(
+        self,
+        signals: Signals,
+        b: float,
+        c: float,
+        md: int,
+        R: float,
+        XL: float,
+        samples_per_cycle: int,
+        RTC: int,
+        RTPC: int = 0,
+        frequency: int = 60,
+        should_be_referred: bool = False,
+    ) -> None:
+        '''Instancia um objeto Ied.
         Args:
-            signals (Signals): Um objeto contendo os sinais de tensão e corrente, vetor de tempo e período de amostragem.
+            signals (Signals): Uma instância de Signals contendo os sinais de tensão, corrente, tempo e período de amostragem.
             b (float): Parâmetro do filtro de antialiasing.
             c (float): Parâmetro do filtro de antialiasing.
             md (int): Fator de downsampling.
             R (float): Resistência do circuito.
             XL (float): Reatância indutiva do circuito.
-            estimator_sample_rate (int): Número de amostras por ciclo para o estimador de fasores.
+            samples_per_cycle (int): A quantidade de amostras capturadas pelo IED em um período da onda fundamental.
             RTC (int): Relação de transformação de corrente.
             RTPC (int): Relação de transformação de potencial capacitivo.
             frequency (int): Frequência da rede elétrica.
-        '''
-        self.signals = signals
-        self.b = b
-        self.c = c
-        self.md = md
-        self.R = R
-        self.XL = XL
-        self.estimator_sample_rate = estimator_sample_rate
-        self.RTC = RTC
-        self.frequency = frequency
-        self._apply_anti_aliasing_filter()
-        self._resample()
-        self._apply_mimic_filter()
-        self._estimate_phasors()
+            should_be_referred (bool): Indica se os sinais devem ser referenciados para o secundário. Default é False.
 
-    def _apply_anti_aliasing_filter(self):
+        Returns:
+            None
         '''
-        Aplica um filtro de antialiasing aos sinais de tensão e corrente.
-        '''
-        for signal_name, signal_data in self.signals:
-            anti_aliasing_filter = AntiAliasingFilter(self.signals.sampling_period, signal_data, self.b, self.c)
-            anti_aliasing_filter.apply_filter()
-            self.signals[signal_name] = anti_aliasing_filter.filtered_signal
-
-    def _resample(self):
-        '''
-        Realiza o downsampling dos sinais de tensão e corrente.
-        '''
-        for signal_name, signal_data in self.signals:
-            self.signals[signal_name] = np.array(signal_data[::self.md])
-        self.signals.t = np.array(self.signals.t[::self.md]).reshape(-1)
-        self.signals.sampling_period = self.signals.t[1] - self.signals.t[0]
-
-    def _apply_mimic_filter(self):
-        '''
-        Aplica o filtro mímico aos sinais de tensão e corrente.
-        '''
-        inductance = self.XL / (2 * np.pi * self.frequency)
-        tau = (inductance / self.R) / self.signals.sampling_period
-        for signal_name, signal_data in self.signals:
-            mimic_filter = MimicFilter(signal_data, tau, self.signals.sampling_period)
-            mimic_filter.apply_filter()
-            self.signals[signal_name] = mimic_filter.filtered_signal
-
-    def _estimate_phasors(self):
-        '''
-        Estima os fasores de tensão e corrente.
-        '''
-        self.phasors = {
-            'va': PhasorEstimator(self.signals.va, self.estimator_sample_rate, len(self.signals.t)),
-            'vb': PhasorEstimator(self.signals.vb, self.estimator_sample_rate, len(self.signals.t)),
-            'vc': PhasorEstimator(self.signals.vc, self.estimator_sample_rate, len(self.signals.t)),
-            'v0': PhasorEstimator(np.zeros_like(self.signals.va), self.estimator_sample_rate, len(self.signals.t)),
-            'ia': PhasorEstimator(self.signals.ia, self.estimator_sample_rate, len(self.signals.t)),
-            'ib': PhasorEstimator(self.signals.ib, self.estimator_sample_rate, len(self.signals.t)),
-            'ic': PhasorEstimator(self.signals.ic, self.estimator_sample_rate, len(self.signals.t)),
-            'i0': PhasorEstimator(np.zeros_like(self.signals.ia), self.estimator_sample_rate, len(self.signals.t)),
+        self._signals = signals
+        self._b = b
+        self._c = c
+        self._md = md
+        self._R = R
+        self._XL = XL
+        self._samples_per_cycle = samples_per_cycle
+        self._RTC = RTC
+        self._RTPC = RTPC
+        self._frequency = frequency
+        self.__relays: dict = {
+            '50N': {},
+            '50F': {},
+            '51N': {},
+            '51F': {},
+            '32F': {},
+            '32N': {},
+            '67': {},
+            '21': {},
         }
-
-        for signal in self.phasors:
-            if signal not in ['v0', 'i0']:
-                self.phasors[signal].estimate()
-
-        self.phasors['v0'].exp_form = (self.phasors['va'].exp_form + self.phasors['vb'].exp_form + self.phasors['vc'].exp_form)
-        self.phasors['v0'].amplitude = abs(self.phasors['va'].exp_form + self.phasors['vb'].exp_form + self.phasors['vc'].exp_form)
-        self.phasors['v0'].phase = np.degrees(np.angle(self.phasors['va'].exp_form + self.phasors['vb'].exp_form
-                                                       + self.phasors['vc'].exp_form))
-
-        self.phasors['i0'].exp_form = (self.phasors['ia'].exp_form + self.phasors['ib'].exp_form + self.phasors['ic'].exp_form)
-        self.phasors['i0'].amplitude = abs(self.phasors['ia'].exp_form + self.phasors['ib'].exp_form + self.phasors['ic'].exp_form)
-        self.phasors['i0'].phase = np.degrees(np.angle(self.phasors['ia'].exp_form + self.phasors['ib'].exp_form +
-                                                       self.phasors['ic'].exp_form))
-
-    def add_51(self, type, gamma, adjust_current, curve):
-        '''
-        Adiciona um elemento de proteção 51 ao sistema.
-        Args:
-            type: O tipo do elemento de proteção (fase ou neutro).
-            gamma: O multiplicador do tempo de ajuste do relé 51.
-            adjust_current: A corrente de ajuste do relé 51.
-            curve: A curva do relé 51.
-        '''
-        (k, a, c) = Curve[curve.upper()].value
-
-        if type == 'phase':
-            trip_times = {'ia': np.array([]), 'ib': np.array([]), 'ic': np.array([])}
-
-            for current in ['ia', 'ib', 'ic']:
-                i_t = (self.phasors[current].amplitude, self.signals.t)
-                i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01  # Evita divisão por zero
-                curve_common_term = gamma * (k / (((i_t[0] / self.RTC) / adjust_current) ** a - 1) + c)
-                trip_times[current] = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
-            self.min_time_51F = {current: np.min(trip_times[current]) for current in ['ia', 'ib', 'ic']}
-
-        elif type == 'neutral':
-            trip_times = np.array([])
-
-            i_t = (self.phasors['i0'].amplitude, self.signals.t)
-            i_t[0][i_t[0] == adjust_current] = adjust_current + 0.01
-            curve_common_term = gamma * (k / (((i_t[0] / self.RTC) / adjust_current) ** a - 1) + c)
-            trip_times = np.where((i_t[0] / self.RTC) <= adjust_current, np.inf, i_t[1] + curve_common_term)
-            self.min_time_51N = np.min(trip_times)
-
-    def add_50(self, type, adjust_current):
-        '''
-        Adiciona um elemento de proteção 50 ao sistema.
-        Args:
-            type: O tipo do elemento de proteção (fase ou neutro).
-            adjust_current: A corrente de ajuste do relé 50.
-        '''
-        if type == 'phase':
-            relays_trip_times = {'a': np.array([]),
-                                 'b': np.array([]),
-                                 'c': np.array([]),
-                                 'b\'': np.array([]),
-                                 'c\'': np.array([]),
-                                 'd\'': np.array([])}
-
-            trip_times = {'ia': relays_trip_times.copy(),
-                          'ib': relays_trip_times.copy(),
-                          'ic': relays_trip_times.copy()}
-
-            self.min_time_50F = {'ia': np.inf, 'ib': np.inf, 'ic': np.inf}
-
-            for current in ['ia', 'ib', 'ic']:
-                for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']:
-                    i_t = (self.phasors[current].amplitude, self.signals.t)
-                    i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01  # Evita divisão por zero
-                    trip_times[current][relay] = np.where(i_t[0] <= adjust_current[relay], np.inf, i_t[1])
-                    curr_relay_min_time = np.min(trip_times[current][relay])
-                    if curr_relay_min_time < self.min_time_50F[current]:
-                        self.min_time_50F[current] = curr_relay_min_time
-
-        elif type == 'neutral':
-            trip_times = {'a': np.array([]),
-                          'b': np.array([]),
-                          'c': np.array([]),
-                          'b\'': np.array([]),
-                          'c\'': np.array([]),
-                          'd\'': np.array([])}
-            for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']:
-                i_t = (self.phasors['i0'].amplitude, self.signals.t)
-                i_t[0][i_t[0] == adjust_current[relay]] = adjust_current[relay] + 0.01
-                trip_times[relay] = np.where(i_t[0] <= adjust_current[relay], np.inf, i_t[1])
-            self.min_time_50N = min([np.min(trip_times[relay]) for relay in ['a', 'b', 'c', 'b\'', 'c\'', 'd\'']])
-
-    def add_32(self, type, alpha, beta):
-        '''
-        Adiciona um elemento de proteção 32 ao sistema.
-        Args:
-            type: O tipo do elemento de proteção (fase ou neutro).
-            alpha: O ângulo de ajuste do relé 32.
-            beta: O ângulo de máximo torque do relé 32.
-        '''
-        if type == 'phase':
-            if alpha == 30:
-                pass
-            elif alpha == 60:
-                pass
-            elif alpha == 90:
-                v_pol_phases = {
-                    'a': np.degrees(np.angle(self.phasors['vb'].exp_form - self.phasors['vc'].exp_form)),
-                    'b': np.degrees(np.angle(self.phasors['vc'].exp_form - self.phasors['va'].exp_form)),
-                    'c': np.degrees(np.angle(self.phasors['va'].exp_form - self.phasors['vb'].exp_form)),
-                }
-
-                i_op_phases = {
-                    'a': self._replace_after_transitions(self.phasors['ia'].phase, 0),
-                    'b': self._replace_after_transitions(self.phasors['ib'].phase, 0),
-                    'c': self._replace_after_transitions(self.phasors['ic'].phase, 0),
-                }
-
-                op_region = {
-                    'a': (v_pol_phases['a'] - 90 + beta, v_pol_phases['a'] + 90 + beta),
-                    'b': (v_pol_phases['b'] - 90 + beta, v_pol_phases['b'] + 90 + beta),
-                    'c': (v_pol_phases['c'] - 90 + beta, v_pol_phases['c'] + 90 + beta),
-                }
-                self.trip_permission_32F = {
-                    'a': ((i_op_phases['a'] > op_region['a'][0]) | np.isnan(i_op_phases['a'])) &
-                         ((i_op_phases['a'] < op_region['a'][1]) | np.isnan(i_op_phases['a'])),
-                    'b': ((i_op_phases['b'] > op_region['b'][0]) | np.isnan(i_op_phases['b'])) &
-                         ((i_op_phases['b'] < op_region['b'][1]) | np.isnan(i_op_phases['b'])),
-                    'c': ((i_op_phases['c'] > op_region['c'][0]) | np.isnan(i_op_phases['c'])) &
-                         ((i_op_phases['c'] < op_region['c'][1]) | np.isnan(i_op_phases['c'])),
-                }
-
-        elif type == 'neutral':
-            if alpha == 30:
-                pass
-            elif alpha == 60:
-                pass
-            elif alpha == 90:
-                v_pol_phases = -self.phasors['v0'].phase
-                i_op_phases = self._replace_after_transitions(self.phasors['i0'].phase, 0)
-                op_region = (-v_pol_phases - 90 + beta, -v_pol_phases + 90 + beta)
-                self.trip_permission_32N = ((i_op_phases > op_region[0]) | np.isnan(i_op_phases)) & \
-                                           ((i_op_phases < op_region[1]) | np.isnan(i_op_phases))
-
-    def add_67(self, type, gamma, timed_adjust_current, insta_adjust_current, curve):
-        '''
-        Adiciona um elemento de proteção 67 ao sistema.
-        Args:
-            type: O tipo do elemento de proteção (fase ou neutro).
-            gamma: O multiplicador do tempo de ajuste do relé 51.
-            timed_adjust_current: A corrente de ajuste do relé 51.
-            insta_adjust_current: A corrente de ajuste do relé 50.
-            curve: A curva do relé 51.
-        '''
-        if type == 'phase':
-            self.add_51(type='phase', gamma=gamma, adjust_current=timed_adjust_current, curve=curve)
-            self.add_50(type='phase', adjust_current=insta_adjust_current)
-            self.add_32(type='phase', alpha=90, beta=30)
-            self.logical_state_51F = {
-                'ia': [0 if t < self.min_time_51F['ia'] else 1 for t in self.signals.t],
-                'ib': [0 if t < self.min_time_51F['ib'] else 1 for t in self.signals.t],
-                'ic': [0 if t < self.min_time_51F['ic'] else 1 for t in self.signals.t],
-            }
-            self.logical_state_50F = {
-                'ia': [0 if t < self.min_time_50F['ia'] else 1 for t in self.signals.t],
-                'ib': [0 if t < self.min_time_50F['ib'] else 1 for t in self.signals.t],
-                'ic': [0 if t < self.min_time_50F['ic'] else 1 for t in self.signals.t],
-            }
-            self.trip_permission_67F = {
-                'a': ((self.logical_state_51F['ia'] & self.trip_permission_32F['a']) |
-                      (self.logical_state_50F['ia'] & self.trip_permission_32F['a'])),
-                'b': ((self.logical_state_51F['ib'] & self.trip_permission_32F['b']) |
-                      (self.logical_state_50F['ib'] & self.trip_permission_32F['b'])),
-                'c': ((self.logical_state_51F['ic'] & self.trip_permission_32F['c']) |
-                      (self.logical_state_50F['ic'] & self.trip_permission_32F['c'])),
-            }
-
-        elif type == 'neutral':
-            self.add_51(type='neutral', gamma=gamma, adjust_current=timed_adjust_current, curve=curve)
-            self.add_50(type='neutral', adjust_current=insta_adjust_current)
-            self.add_32(type='neutral', alpha=90, beta=30)
-            self.logical_state_51N = [0 if t < self.min_time_51N else 1 for t in self.signals.t]
-            self.logical_state_50N = [0 if t < self.min_time_50N else 1 for t in self.signals.t]
-            self.trip_permission_67N = ((self.logical_state_51N & self.trip_permission_32N) |
-                                        (self.logical_state_50N & self.trip_permission_32N))
-
-    def add_21(self, inclination_angle, zones_impedances, line_z1, line_z0):
-        self.distance_trip_signals = {
-            'at': {'zone1': None, 'zone2': None, 'zone3': None},
-            'bt': {'zone1': None, 'zone2': None, 'zone3': None},
-            'ct': {'zone1': None, 'zone2': None, 'zone3': None},
-            'ab': {'zone1': None, 'zone2': None, 'zone3': None},
-            'bc': {'zone1': None, 'zone2': None, 'zone3': None},
-            'ca': {'zone1': None, 'zone2': None, 'zone3': None},
+        self._trips: dict = {
+            '50N': {},
+            '50F': {},
+            '51N': {},
+            '51F': {},
+            '32F': {},
+            '32N': {},
+            '67': {},
+            '21': {},
         }
-        self.measured_impedances = {'at': None, 'bt': None, 'ct': None, 'ab': {}, 'bc': {}, 'ca': {}}
+        self.__refer_to_secondary(should_be_referred)
+        self.__apply_anti_aliasing_filter()
+        self.__resample_signals()
+        self.__apply_mimic_filter()
+        self.__estimate_phasors()
 
-        s_op = {'at': {}, 'bt': {}, 'ct': {}, 'ab': {}, 'bc': {}, 'ca': {}}
+    @property
+    def phasors(self):
+        return self.__phasors
 
-        impedance = {'zone1': zones_impedances[0], 'zone2': zones_impedances[1], 'zone3': zones_impedances[2]}
-        k = (line_z0 - line_z1) / line_z1
+    @property
+    def relays(self):
+        return self.__relays
 
-        for unit in ['at', 'bt', 'ct', 'ab', 'bc', 'ca']:
-            if unit in ['at', 'bt', 'ct']:
-                vr = self.phasors['v' + unit[0]].exp_form[16:]
-                ir = self.phasors['i' + unit[0]].exp_form[16:] + k * (1/3) * self.phasors['i0'].exp_form[16:]
-                self.measured_impedances[unit] = vr / ir
-                v_pol = 'bc' if unit == 'at' else 'ca' if unit == 'bt' else 'ab'
-                s_pol = 1j * self.phasors['v' + v_pol[0]].exp_form[16:] - self.phasors['v' + v_pol[1]].exp_form[16:]
+    def __refer_to_secondary(self, should_be_referred: bool) -> None:
+        '''Atualiza os sinais para a referência secundária caso os dados passados para o IED estejam na referência primária.
+        Args:
+            should_be_referred (bool): Indica se os sinais devem ser referenciados para a secundária.
 
-            if unit in ['ab', 'bc', 'ca']:
-                ir = self.phasors['i' + unit[0]].exp_form[16:] - self.phasors['i' + unit[1]].exp_form[16:]
-                vr = self.phasors['v' + unit[0]].exp_form[16:] - self.phasors['v' + unit[1]].exp_form[16:]
-                self.measured_impedances[unit] = vr / ir
-                v_pol = 'c' if unit == 'ab' else 'a' if unit == 'bc' else 'b'
-                s_pol = -1j * self.phasors['v' + v_pol].exp_form[16:]
+        Returns:
+            None
+        '''
+        if should_be_referred:
+            for current_name, current_value in self._signals.get_currents():
+                self._signals[current_name] = current_value / self._RTC
 
-            for zone in ['zone1', 'zone2', 'zone3']:
-                s_op[unit][zone] = (
-                    np.abs(impedance[zone]) * (np.cos(inclination_angle) + 1j * np.sin(inclination_angle)) * ir - vr
-                )
+            for voltage_name, voltage_value in self._signals.get_voltages():
+                self._signals[voltage_name] = voltage_value / self._RTPC
 
-                cos_comparator = np.real(s_op[unit][zone] * np.conj(s_pol))
-                normalized_cos_comparator = cos_comparator / (np.abs(cos_comparator) + 1e-15)
-                self.distance_trip_signals[unit][zone] = np.where(normalized_cos_comparator >= 0.99, 1, 0)
+    def __apply_anti_aliasing_filter(self) -> None:
+        '''Aplica o filtro de antialiasing aos sinais de tensão e corrente com o auxílio da classe AntiAliasingFilter, salvando os sinais filtrados na propriedade aa_signals.
+
+        Returns:
+            None
+        '''
+        self._anti_aliasing_filter = AntiAliasingFilter(self._signals.sampling_period, self._b, self._c)
+        self._aa_signals = Signals(t=self._signals.t, sampling_period=self._signals.sampling_period)
+
+        for signal_name, signal_data in self._signals:
+            self._aa_signals[signal_name] = self._anti_aliasing_filter.apply_filter(signal_data)  # type: ignore
+
+    def __resample_signals(self) -> None:
+        '''Realiza o downsampling dos sinais aa_signals com o fator de decimação md e salva os novos sinais na propriedade resampled_aa_signals.
+
+        Returns:
+            None
+        '''
+        self._resampled_aa_signals = Signals(
+                                        t=self._aa_signals.t[::self._md],
+                                        sampling_period=self._aa_signals.sampling_period * self._md
+                                    )
+
+        for signal_name, signal_data in self._aa_signals:
+            self._resampled_aa_signals[signal_name] = np.array(signal_data[::self._md])
+
+    def __apply_mimic_filter(self) -> None:
+        '''Aplica o filtro MIMIC aos sinais resampledados e salva os sinais filtrados na propriedade mimic_filtered_signals.
+
+        Returns:
+            None
+        '''
+        inductance = self._XL / (2 * np.pi * self._frequency)
+        tau = (inductance / self._R) / self._resampled_aa_signals.sampling_period
+        self._mimic_filter = MimicFilter(tau, self._resampled_aa_signals.sampling_period)
+        self._mimic_filtered_signals = Signals(t=self._resampled_aa_signals.t, sampling_period=self._resampled_aa_signals.sampling_period)
+
+        for signal_name, signal_data in self._resampled_aa_signals:
+            self._mimic_filtered_signals[signal_name] = self._mimic_filter.apply_filter(signal_data)  # type: ignore
+
+    def __estimate_phasors(self) -> None:
+        '''Estima os fasores de tensão e corrente com o auxílio da classe PhasorEstimator.
+
+        Returns:
+            None
+        '''
+        self._phasor_estimator = PhasorEstimator(self._samples_per_cycle)
+        self.__phasors = Signals(t=self._mimic_filtered_signals.t, sampling_period=self._mimic_filtered_signals.sampling_period)
+
+        for signal_name, signal_data in self._mimic_filtered_signals:
+            if signal_name not in ['v0', 'i0']:
+                self.__phasors[signal_name] = self._phasor_estimator.estimate(signal_data)  # type: ignore
+
+        self.__phasors['vn'] = (self.__phasors.va + self.__phasors.vb + self.__phasors.vc)
+        self.__phasors['in'] = (self.__phasors.ia + self.__phasors.ib + self.__phasors.ic)
+
+    def add_relay(self, relay_type: str, **kwargs):
+        match relay_type:
+            case '51N':
+                self.__relays['51N'] = relays.NeutralRelay51(
+                    time_vector=self._mimic_filtered_signals.t,
+                    neutral_current=self.__phasors['in'].astype(np.complex128),  # Cast to avoid mypy error
+                    **kwargs
+                    )
+            case '51F':
+                self.__relays['51F'] = relays.PhaseRelay51(
+                    time_vector=self._mimic_filtered_signals.t,
+                    current_phasors=self.__phasors,
+                    **kwargs
+                    )
+            case '50N':
+                self.__relays['50N'] = relays.NeutralRelay50(
+                    time_vector=self._mimic_filtered_signals.t,
+                    neutral_current=self.__phasors['in'].astype(np.complex128),  # Cast to avoid mypy error
+                    **kwargs
+                    )
+            case '50F':
+                self.__relays['50F'] = relays.PhaseRelay50(
+                    time_vector=self._mimic_filtered_signals.t,
+                    current_phasors=self.__phasors,
+                    **kwargs
+                    )
+            case '32F':
+                self.__relays['32F'] = relays.PhaseRelay32(
+                    phasors=self.__phasors,
+                    **kwargs
+                    )
+            case '32N':
+                self.__relays['32N'] = relays.NeutralRelay32(
+                    zero_seq_current=1/3 * getattr(self.__phasors, 'in'),
+                    zero_seq_voltage=1/3 * getattr(self.__phasors, 'vn'),
+                    **kwargs
+                    )
+            case '67F':
+                self.__relays['67F'] = relays.PhaseRelay67(
+                    trips=self._trips,
+                    time_vector=self._mimic_filtered_signals.t,
+                    )
+            case '67N':
+                self.__relays['67N'] = relays.NeutralRelay67(
+                    trips=self._trips,
+                    time_vector=self._mimic_filtered_signals.t,
+                    )
+            case _:
+                raise NotImplementedError(f"Relay type {relay_type} not implemented.")
+
+        self._trips[relay_type] = self.__relays[relay_type].analyze_trip()
+
+    # def add_21(self, inclination_angle, zones_impedances, line_z1, line_z0):
+    #     self.distance_trip_signals = {
+    #         'at': {'zone1': None, 'zone2': None, 'zone3': None},
+    #         'bt': {'zone1': None, 'zone2': None, 'zone3': None},
+    #         'ct': {'zone1': None, 'zone2': None, 'zone3': None},
+    #         'ab': {'zone1': None, 'zone2': None, 'zone3': None},
+    #         'bc': {'zone1': None, 'zone2': None, 'zone3': None},
+    #         'ca': {'zone1': None, 'zone2': None, 'zone3': None},
+    #     }
+    #     self.measured_impedances = {'at': None, 'bt': None, 'ct': None, 'ab': {}, 'bc': {}, 'ca': {}}
+
+    #     s_op = {'at': {}, 'bt': {}, 'ct': {}, 'ab': {}, 'bc': {}, 'ca': {}}
+
+    #     impedance = {'zone1': zones_impedances[0], 'zone2': zones_impedances[1], 'zone3': zones_impedances[2]}
+    #     k = (line_z0 - line_z1) / line_z1
+
+    #     for unit in ['at', 'bt', 'ct', 'ab', 'bc', 'ca']:
+    #         if unit in ['at', 'bt', 'ct']:
+    #             vr = self.phasors['v' + unit[0]].exp_form[16:]
+    #             ir = self.phasors['i' + unit[0]].exp_form[16:] + k * (1/3) * self.phasors['i0'].exp_form[16:]
+    #             self.measured_impedances[unit] = vr / ir
+    #             v_pol = 'bc' if unit == 'at' else 'ca' if unit == 'bt' else 'ab'
+    #             s_pol = 1j * self.phasors['v' + v_pol[0]].exp_form[16:] - self.phasors['v' + v_pol[1]].exp_form[16:]
+
+    #         if unit in ['ab', 'bc', 'ca']:
+    #             ir = self.phasors['i' + unit[0]].exp_form[16:] - self.phasors['i' + unit[1]].exp_form[16:]
+    #             vr = self.phasors['v' + unit[0]].exp_form[16:] - self.phasors['v' + unit[1]].exp_form[16:]
+    #             self.measured_impedances[unit] = vr / ir
+    #             v_pol = 'c' if unit == 'ab' else 'a' if unit == 'bc' else 'b'
+    #             s_pol = -1j * self.phasors['v' + v_pol].exp_form[16:]
+
+    #         for zone in ['zone1', 'zone2', 'zone3']:
+    #             s_op[unit][zone] = (
+    #                 np.abs(impedance[zone]) * (np.cos(inclination_angle) + 1j * np.sin(inclination_angle)) * ir - vr
+    #             )
+
+    #             cos_comparator = np.real(s_op[unit][zone] * np.conj(s_pol))
+    #             normalized_cos_comparator = cos_comparator / (np.abs(cos_comparator) + 1e-15)
+    #             self.distance_trip_signals[unit][zone] = np.where(normalized_cos_comparator >= 0.99, 1, 0)
 
     @property
     def trip_signal(self):
         '''
         Retorna o sinal de disparo do IED
         '''
-        return (self.trip_permission_67F['a'] | self.trip_permission_67F['b'] |
-                self.trip_permission_67F['c'] | self.trip_permission_67N)
-
-    def _replace_after_transitions(self, arr, n):
-        '''
-        Substitui n amostras após uma transição + -> - por NaN.
-        '''
-        arr = np.array(arr, dtype=float)
-        length = len(arr)
-
-        for i in range(length - 1):
-            if arr[i] > 0 and arr[i + 1] < 0:
-                start_index = max(i - n + 1, 0)
-                arr[start_index:i + 1] = np.nan
-
-                end_index = min(i + 1 + n, length)
-                arr[i + 1:end_index] = np.nan
-        return arr
+        return (self._trips['67F']['ia'] | self._trips['67F']['ib'] | self._trips['67F']['ic']) | self._trips['67N']['neutral']
