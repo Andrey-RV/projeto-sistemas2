@@ -1,4 +1,4 @@
-from scipy.signal import fftconvolve  # type: ignore
+from scipy.signal import fftconvolve
 from filters import FourierFilter
 import numpy as np
 import numpy.typing as npt
@@ -12,9 +12,9 @@ class PhasorEstimator:
         Args:
             samples_per_cycle (int): A quantidade de amostras capturadas pelo IED em um período da onda fundamental.
         '''
-        self.__samples_per_cycle = samples_per_cycle
-        self.__fourier_filters = FourierFilter(self.__samples_per_cycle)
-        self.__fourier_filters.create_filter()
+        self._samples_per_cycle = samples_per_cycle
+        self._fourier_filters = FourierFilter(self._samples_per_cycle)
+        self._fourier_filters.create_filter()
 
     def estimate(self, signal: npt.NDArray[np.float64]) -> npt.NDArray[np.complex128]:
         '''
@@ -27,8 +27,8 @@ class PhasorEstimator:
             npt.NDArray[np.complex128]: O fasor estimado.
         '''
 
-        real = fftconvolve(signal, self.__fourier_filters.cosine_filter)[:len(signal)]
-        imaginary = fftconvolve(signal, self.__fourier_filters.sine_filter)[:len(signal)]
+        real = fftconvolve(signal, self._fourier_filters.cosine_filter)[:len(signal)]
+        imaginary = fftconvolve(signal, self._fourier_filters.sine_filter)[:len(signal)]
 
-        phasor = real + 1j * imaginary
-        return phasor
+        estimated_phasor = real + 1j * imaginary
+        return estimated_phasor
