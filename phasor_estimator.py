@@ -16,9 +16,6 @@ class PhasorEstimator:
         self.__fourier_filters = FourierFilter(self.__samples_per_cycle)
         self.__fourier_filters.create_filter()
 
-    def __repr__(self) -> str:
-        return (f"PhasorEstimator(samples_per_cycle={self.__samples_per_cycle})")
-
     def estimate(self, signal: npt.NDArray[np.float64]) -> npt.NDArray[np.complex128]:
         '''
         Retorna a representação complexa do fasor estimado.
