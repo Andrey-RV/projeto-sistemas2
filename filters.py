@@ -1,143 +1,109 @@
 import numpy as np
 import numpy.typing as npt
+from scipy.signal import sosfilt
 
 
 class AntiAliasingFilter:
     def __init__(self, sampling_period: float, b: float, c: float) -> None:
-        '''Instancia um filtro de anti-aliasing.
+        '''Implementa um filtro de anti-aliasing usando um filtro IIR de segunda ordem.
+
         Args:
-            signal (npt.NDArray[np.float64]): O sinal a ser filtrado.
             sampling_period (float): O período de amostragem do sinal.
             b (float): Coeficiente b do filtro.
             c (float): Coeficiente c do filtro.
-
-        Returns:
-            None
         '''
-        self.__sampling_period = sampling_period
-        self.__a = 2 / self.__sampling_period
-        self.__b = b
-        self.__c = c
+        self._sampling_period = sampling_period
+        self._a = 2 / self._sampling_period
+        self._b = b
+        self._c = c
+        self._init_coeffs()
 
-    def __repr__(self) -> str:
-        return (
-            f"AntiAliasingFilter("
-            f"sampling_period={self.__sampling_period}, "
-            f"a={self.__a}, b={self.__b}, c={self.__c})"
-        )
+    def _init_coeffs(self) -> None:
+        """Pré calcula os coeficientes do filtro."""
+        denominator = self._a**2 + self._a*self._b + self._c
+        c0 = self._c / denominator
+        c1 = 2*self._c / denominator
+        c2 = self._c / denominator
+        d1 = 2*(self._c - self._a**2) / denominator
+        d2 = (self._a**2 + self._c - self._a*self._b) / denominator
 
-    def apply_filter(self, signal: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        r'''Retorna um sinal filtrado pelo filtro de anti-aliasing
+        self._sos = np.array([[c0, c1, c2, 1, d1, d2]])
 
-            $$x_0 = c_0.x_0$$
-            $$x_1 = c_0.x_1 + c_1.x_0 - d_1.x_0$$
-            $$ \x_{out}(n) = \left[c_0.x_{in}(n) + c_1.x_{in}(n-1) + c_2.x_{in}(n-2)\right] - \left[d_1.x_{out}(n-1)
-            + d_2.x_{out}(n-2)right], \quad n \geq 2$$
+    def apply_filter(self, signal: npt.NDArray[np.float64]) -> npt.NDArray[np.floating]:
+        r'''Aplica um filtro de anti-aliasing ao sinal de entrada.
+
+            Essa operação pode ser descrita pela equação de diferenças:
+            $$ \x_{out}(n)=\left[c_0.x_{in}(n)+c_1.x_{in}(n-1)+c_2.x_{in}(n-2)\right]-
+            \left[d_1.x_{out}(n-1)+d_2.x_{out}(n-2)\right]$$
+
+            ou, no domínio Z:
+            $$H(z)=\frac{c_0+c_1z^{-1}+c_2z^{-2}}{1+d_1z^{-1}+d_2z^{-2}}$$
 
             Returns:
-                npt.NDArray[np.float64]: O sinal filtrado.
+                npt.NDArray[np.floating]: O sinal filtrado.
         '''
-        denominator = (self.__a**2 + self.__a*self.__b + self.__c)
-        c0 = self.__c / denominator
-        c1 = 2 * c0
-        c2 = c0
-        d1 = 2 * (self.__c - self.__a**2) / denominator
-        d2 = (self.__a**2 + self.__c - self.__a*self.__b) / denominator
-
-        filtered_signal = np.zeros_like(signal)
-        filtered_signal[0] = c0 * signal[0]
-        filtered_signal[1] = c0 * signal[1] + c1 * signal[0] - d1 * filtered_signal[0]
-
-        for i in range(2, len(signal)):
-            filtered_signal[i] = (
-                c0 * signal[i-2]
-                + c1 * signal[i-1]
-                + c2 * signal[i]
-                - d1 * filtered_signal[i-1]
-                - d2 * filtered_signal[i-2]
-            )
-
-        return filtered_signal
+        return sosfilt(self._sos, signal)
 
 
 class FourierFilter:
     def __init__(self, samples_per_cycle: int, mode: str = "full") -> None:
         '''Instancia um filtro de fourier contendo os filtros cosseno e seno.
+
         Args:
             samples_per_cycle (int): A quantidade de amostras capturadas pelo IED em um período da onda fundamental.
-
-        Returns:
-            None
+            mode (str): O modo de operação do filtro. Pode ser "full" ou "half". Default: "full".
         '''
-        self.__samples_per_cycle = samples_per_cycle
-        self.__mode = mode
-
-    def __repr__(self) -> str:
-        return (
-            f"FourierFilter("
-            f"mode={self.__mode}, "
-            f"samples_per_cycle={self.__samples_per_cycle}, "
-            f"cosine_filter={'set' if hasattr(self, 'cosine_filter') else 'unset'}, "
-            f"sine_filter={'set' if hasattr(self, 'sine_filter') else 'unset'})"
-        )
+        self._samples_per_cycle = samples_per_cycle
+        self._mode = mode
 
     def create_filter(self) -> None:
         r'''Cria os filtros cosseno e seno de Fourier para a quantidade de amostras por ciclo especificada.
-              $$\cos(k) = \frac{2}{N} \sum_{k=1}^{N} \cos(2\pi k/N)$$
-              $$\sin(k) = \frac{2}{N} \sum_{k=1}^{N} \sin(2\pi k/N)$$
+          Para cada amostra $n$ com $n = 0, 1, \ldots, N-1$, os filtros são definidos como:
 
-        Returns:
-            None
-        '''
-        if self.__mode == "full":
-            filter_args = np.linspace(0, 2*np.pi, self.__samples_per_cycle, endpoint=False)
-            self.cosine_filter = (2 / self.__samples_per_cycle * np.cos(filter_args))
-            self.sine_filter = (2 / self.__samples_per_cycle * np.sin(filter_args))
+          $$c[n] = \frac{2}{N} \cos\left(\frac{2\pi n}{N}\right)$$
+          $$s[n] = \frac{2}{N} \sin\left(\frac{2\pi n}{N}\right)$$
+
+          onde $N$ é o número total de amostras por ciclo.
+          '''
+        if self._mode == "full":
+            args = np.linspace(0, 2*np.pi, self._samples_per_cycle, endpoint=False)
+            self.cosine_filter = (2 / self._samples_per_cycle * np.cos(args))
+            self.sine_filter = (2 / self._samples_per_cycle * np.sin(args))
         else:  # TODO: Implementar o modo "half"
             raise NotImplementedError("O modo 'half' ainda não foi implementado.")
 
 
 class MimicFilter:
-    def __init__(self, tau: float, sampling_period: float) -> None:
+    def __init__(self, tau: float, sampling_period: float, freq: float = 60.0) -> None:
         '''Instancia um filtro mímico cujo objetivo é a remoção da componente CC do sinal.
         Args:
+
             tau (float): O valor de tau do sistema.
             sampling_period (float): O período de amostragem do sinal.
-
-        Returns:
-            None
+            freq (float): A frequência da onda fundamental. Default: 60.0.
         '''
-        self.__tau = tau
-        self.__sampling_period = sampling_period
+        self._tau = tau
+        self._sampling_period = sampling_period
+        self._freq = freq
+        self._init_coefficients()
 
-    def __repr__(self) -> str:
-        return (
-            f"MimicFilter("
-            f"tau={self.__tau}, "
-            f"sampling_period={self.__sampling_period}, "
-            f"k={'set' if hasattr(self, 'k') else 'unset'})"
-        )
+    def _init_coefficients(self) -> None:
+        """Pre-calculates filter coefficients"""
+        arg = 2 * np.pi * self._freq * self._sampling_period
+        cos_term = np.cos(arg)
+        sin_term = np.sin(arg)
+        denominator = np.sqrt((1 + self._tau - self._tau * cos_term)**2 + (self._tau * sin_term)**2)
 
-    def apply_filter(self, signal: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        self._k = 1 / denominator
+        self._sos = np.array([[self._k * (1 + self._tau), -self._k * self._tau, 0, 1, 0, 0]])
+
+    def apply_filter(self, signal: npt.NDArray[np.float64]) -> npt.NDArray[np.floating]:
         r'''Retorna um sinal filtrado pelo filtro mímico.
-        $$k = \frac{1}{\sqrt{(1 + \tau - \tau \cos(120\pi T_s))^2 + (\tau \sin(120\pi T_s))^2}}$$
-        $$x_0 = k(1 + \tau)x_0$$
-        $$x_{out}(n) = k \left[(1 + \tau) x_{in}(n) - \tau x_{in}(n-1)\right], \quad n \geq 1$$
 
-        Returns:
-            None
+            Essa operação pode ser descrita pela equação de diferenças:
+            $$x_{out}(n) = k \left[(1 + \tau) x_{in}(n) - \tau x_{in}(n-1)\right]$$
+
+            ou, no domínio Z:
+            $$H(z) = \frac{k(1 + \tau) - k\tau z^{-1}}{1}$$
         '''
-        cos_term = np.cos(120*np.pi * self.__sampling_period)
-        sine_term = np.sin(120*np.pi * self.__sampling_period)
-
-        self.k = 1 / np.sqrt((1 + self.__tau - self.__tau * cos_term)**2 + (self.__tau * sine_term)**2)
-
-        filtered_signal = np.zeros_like(signal)
-        filtered_signal[0] = self.k * (1 + self.__tau) * signal[0]
-
-        for i in range(1, len(signal)):
-            filtered_signal[i] = self.k * (
-                (1 + self.__tau) * signal[i] - self.__tau * signal[i-1]
-            )
-
-        return filtered_signal
+        return sosfilt(self._sos, signal)
