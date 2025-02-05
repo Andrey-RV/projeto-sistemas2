@@ -46,13 +46,9 @@ class Signals:
             yield signal, getattr(self, signal)
 
     def __setitem__(self, key, value) -> None:
-        if not hasattr(self, key):
-            raise KeyError(f"Invalid signal name: {key}")
         setattr(self, key, value)
 
     def __getitem__(self, key) -> npt.NDArray[np.float64]:
-        if not hasattr(self, key):
-            raise KeyError(f"Invalid signal name: {key}")
         return getattr(self, key)
 
     def get_voltages(self) -> tuple[name_value_pair, name_value_pair, name_value_pair]:
