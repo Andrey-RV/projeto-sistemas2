@@ -1,9 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
+from matplotlib.lines import Line2D
+from matplotlib.figure import Figure
+from typing import Sequence
+from ied import Ied
 
 
-def configure_figure(figure):  # type: ignore
+def configure_relays_trip_figure(figure: Figure) -> None:
     for ax in figure.get_axes():
         ax.spines[:].set_visible(False)
         ax.set_xticks([])
@@ -12,91 +16,147 @@ def configure_figure(figure):  # type: ignore
         ax.set_yticks([0, 1])
 
 
-def configure_x_axis(axis, resample_limit):
-    axis.set_xticks(np.linspace(0, resample_limit, 8))
-    axis.set_xlabel('Time (s)')
-    axis.xaxis.set_visible(True)
-
-
-def plot_trips(ied, title, resample_limit=0.7):
+def plot_51f_50f_32f_trips(ied: Ied, title: str, resample_limit: float = 0.7) -> None:
     chopped_time = [t for t in ied._mimic_filtered_signals.t if t < resample_limit]
     state_50F = {phase: (ied._mimic_filtered_signals.t >= ied._trips["50F"][phase]) for phase in ["ia", "ib", "ic"]}
     state_51F = {phase: (ied._mimic_filtered_signals.t >= ied._trips["51F"][phase]) for phase in ["ia", "ib", "ic"]}
-    state_50N = ied._mimic_filtered_signals.t >= ied._trips["50N"]["neutral"]
-    state_51N = ied._mimic_filtered_signals.t >= ied._trips["51N"]["neutral"]
 
-    # Primeira figura com os relés 51F, 50F e 32F
     figure, axis = plt.subplots(9, 1, figsize=(10, 15))
 
-    for i, phase in enumerate(['ia', 'ib', 'ic']):
-        axis[i].plot(ied._mimic_filtered_signals.t, state_51F[phase],
-                     label=f'51{chr(65+i)}', linewidth=2, color=['black', 'blue', 'red'][i])
+    for i, phase in enumerate(['ia', 'ib', 'ic']):  # Relés 51F
+        axis[i].plot(
+            ied._mimic_filtered_signals.t, state_51F[phase],
+            label=f'51{chr(65+i)}',
+            linewidth=2,
+            color=['black', 'blue', 'red'][i]
+        )
 
-    for i, phase in enumerate(['ia', 'ib', 'ic']):
-        axis[i + 3].plot(ied._mimic_filtered_signals.t, state_50F[phase],
-                         label=f'50{chr(65+i)}', linewidth=2, color=['black', 'blue', 'red'][i])
+    for i, phase in enumerate(['ia', 'ib', 'ic']):  # Relés 50F
+        axis[i + 3].plot(
+            ied._mimic_filtered_signals.t, state_50F[phase],
+            label=f'50{chr(65+i)}',
+            linewidth=2,
+            color=['black', 'blue', 'red'][i]
+        )
 
-    for i, phase in enumerate(['a', 'b', 'c']):
-        axis[i + 6].plot(chopped_time, ied._trips["32F"][phase][: len(chopped_time)],
-                         label=f'32{chr(65+i)}', linewidth=2, color=['black', 'blue', 'red'][i])
+    for i, phase in enumerate(['a', 'b', 'c']):  # Relés 32F
+        axis[i + 6].plot(
+            chopped_time, ied._trips["32F"][phase][: len(chopped_time)],
+            label=f'32{chr(65+i)}',
+            linewidth=2,
+            color=['black', 'blue', 'red'][i]
+        )
 
-    configure_figure(figure)
+    configure_relays_trip_figure(figure)
     plt.suptitle(title)
     plt.tight_layout()
     plt.show(block=True)
 
-    # Segunda figura com os relés 32N, 51N, 50N, 67F e 67N
+
+def plot_51n_50n_32n_67f_67n_trips(ied: Ied, title: str, resample_limit: float = 0.7) -> None:
+    chopped_time = [t for t in ied._mimic_filtered_signals.t if t < resample_limit]
+    state_50N = ied._mimic_filtered_signals.t >= ied._trips["50N"]["neutral"]
+    state_51N = ied._mimic_filtered_signals.t >= ied._trips["51N"]["neutral"]
+
     figure, axis = plt.subplots(8, 1, figsize=(10, 15))
 
-    axis[0].plot(ied._mimic_filtered_signals.t, state_51N, label='51N', linewidth=2, color='black')
-    axis[1].plot(ied._mimic_filtered_signals.t, state_50N, label='50N', linewidth=2, color='black')
-    axis[2].plot(chopped_time, ied._trips["32N"]["neutral"]
-                 [:len(chopped_time)], label='32N', linewidth=2, color='black')
+    axis[0].plot(  # Relé 51N
+        ied._mimic_filtered_signals.t, state_51N, label='51N',
+        linewidth=2,
+        color='black'
+    )
+
+    axis[1].plot(  # Relé 50N
+        ied._mimic_filtered_signals.t, state_50N,
+        label='50N',
+        linewidth=2,
+        color='black'
+    )
+
+    axis[2].plot(  # Relé 32N
+        chopped_time, ied._trips["32N"]["neutral"][:len(chopped_time)],
+        label='32N',
+        linewidth=2,
+        color='black'
+    )
 
     for i, phase in enumerate(['ia', 'ib', 'ic']):
-        axis[i + 3].plot(ied._mimic_filtered_signals.t, ied._trips["67F"][phase],
-                         label=f'67{chr(65+i)}', linewidth=2, color=['black', 'blue', 'red'][i])
+        axis[i + 3].plot(  # Relés 67F
+            ied._mimic_filtered_signals.t, ied._trips["67F"][phase],
+            label=f'67{chr(65+i)}',
+            linewidth=2,
+            color=['black', 'blue', 'red'][i])
 
-    axis[6].plot(ied._mimic_filtered_signals.t, ied._trips["67N"]["neutral"], label='67N', linewidth=2, color='black')
-    axis[7].plot(ied._mimic_filtered_signals.t, ied.trip_signal, label='Trip signal', linewidth=2, color='black')
+    axis[6].plot(  # Relé 67N
+        ied._mimic_filtered_signals.t, ied._trips["67N"]["neutral"],
+        label='67N',
+        linewidth=2,
+        color='black'
+    )
 
-    configure_figure(figure)
-    configure_x_axis(axis[7], resample_limit)
+    axis[7].plot(
+        ied._mimic_filtered_signals.t, ied.trip_signal,
+        label='Trip signal',
+        linewidth=2,
+        color='black'
+    )
 
+    configure_relays_trip_figure(figure)
+    axis[7].set_xticks(np.linspace(0, resample_limit, 8))
+    axis[7].set_xlabel('Time (s)')
+    axis[7].xaxis.set_visible(True)
     plt.suptitle(title)
     plt.tight_layout()
     plt.show(block=True)
 
 
 # Função para criar o gráfico polar
-def create_polar_plot(ax, angle_v_pol, angle_i_op):
 
-    # Criação da área hachurada no gráfico polar para a região de operação beta = 30°
-    theta = np.linspace(np.radians(angle_v_pol - 60), np.radians(angle_v_pol + 120), 100)
-    radius = np.ones_like(theta)
-    hatch_fill = ax.fill(theta, radius, color='lightblue', alpha=0.5, hatch='//')
 
-    # Configurações do gráfico polar
-    ax.set_thetamin(0)
-    ax.set_thetamax(360)
-    ax.set_rlabel_position(0)
-    ax.set_yticklabels([])
+def plot_32_polar_regions(v_pol_angles: Sequence[float], i_op_angles: Sequence[float], beta: float) -> None:
+    figure = plt.figure(figsize=(10, 10))
+    grid_spec = GridSpec(3, 2, height_ratios=[1, 1, 0.5])
 
-    # Adiciona as setas no gráfico polar
-    ax.annotate('', xy=(np.radians(angle_v_pol), 1.05), xytext=(0, 0),
-                arrowprops=dict(arrowstyle='->', color='black', lw=2))
-    ax.annotate('', xy=(np.radians(angle_i_op), 1.05), xytext=(0, 0),
-                arrowprops=dict(arrowstyle='->', color='red', lw=2))
+    ax1 = figure.add_subplot(grid_spec[0, 0], polar=True)
+    ax2 = figure.add_subplot(grid_spec[0, 1], polar=True)
+    ax3 = figure.add_subplot(grid_spec[1, :], polar=True)
+    axes = [ax1, ax2, ax3]
+    legend_positions = [(1.1, 1.0), (1.1, 1.0), (0.5, -0.2)]
 
-    # Adiciona a legenda no gráfico polar
-    legend_text = f"{angle_v_pol - 60:.2f}° ≤ " + r"$R_{op}$" + f" ≤ {angle_v_pol + 120:.2f}°"
-    handles, labels = ax.get_legend_handles_labels()
-    handles.append(hatch_fill[0])
-    labels.append(legend_text)
+    for ax, v_pol_angle, i_op_angle in zip(axes, v_pol_angles, i_op_angles):
+        ax.set_thetamin(0)  # type: ignore
+        ax.set_thetamax(360)  # type: ignore
+        ax.set_rlabel_position(0)  # type: ignore
+        ax.set_yticklabels([])
 
-    # Configuração da legenda
-    ax.legend(handles, labels, loc='upper right', bbox_to_anchor=(0.4, 1.7), fontsize=8,
-              framealpha=1, facecolor='white', edgecolor='black', title_fontsize='x-small')
+        handles, labels = [], []
+        start_angle = v_pol_angle - 90 + beta
+        end_angle = v_pol_angle + 90 + beta
+        theta = np.linspace(np.radians(start_angle), np.radians(end_angle), 100)
+        # theta = np.linspace(np.radians(v_pol_angle - 90 + beta), np.radians(v_pol_angle + 90 + beta), 100)
+        radius = np.ones_like(theta)
+        region = ax.fill(theta, radius, color='lightblue', alpha=0.3, hatch='//')
+
+        handles.append(region[0])
+        labels.append(f"{start_angle:.2f}° ≤ $R_{{op}}$ ≤ {end_angle:.2f}°")
+
+        ax.annotate('', xy=(np.radians(v_pol_angle), 1.05), xytext=(0, 0),
+                    arrowprops=dict(arrowstyle='->', color='black', lw=2))
+        ax.annotate('', xy=(np.radians(i_op_angle), 1.05), xytext=(0, 0),
+                    arrowprops=dict(arrowstyle='->', color='red', lw=2))
+
+        handles.extend([
+            Line2D([0], [0], color='black', lw=2, marker='>', markersize=8),
+            Line2D([0], [0], color='red', lw=2, marker='>', markersize=8)
+        ])
+        labels.extend([r"$V_{pol}$ angle", r"$I_{op}$ angle"])
+
+        idx = axes.index(ax)
+        ax.legend(handles, labels, loc='upper left', bbox_to_anchor=legend_positions[idx],
+                  fontsize=8, framealpha=1, facecolor='white', edgecolor='black')
+
+    plt.tight_layout()
+    plt.show(block=True)
 
 
 # Função para criar o gráfico de curvas de coordenação do relé 51
@@ -134,24 +194,6 @@ def plot_trip_times(currents, trip_times, title):
 
 
 if __name__ == '__main__':
-
-    # Criação da figura e dos subplots
-    fig = plt.figure(figsize=(10, 7))
-    gs = GridSpec(3, 2, height_ratios=[1, 1, 0.5])
-
-    # Primeiro gráfico polar
-    ax1 = fig.add_subplot(gs[0, 0], polar=True)
-    create_polar_plot(ax1, -85.58, -173.85)
-
-    # Segundo gráfico polar
-    ax2 = fig.add_subplot(gs[0, 1], polar=True)
-    create_polar_plot(ax2, 154.42, 66.15)
-
-    # Terceiro gráfico polar
-    ax3 = fig.add_subplot(gs[1, :], polar=True)
-    create_polar_plot(ax3, 34.42, -53.85)
-
-    plt.show()
 
     # Inicialização dos dicionários vazios de tempos de atuação
     phase_trip_times = {key: np.array([]) for key in ['c', 'b', 'a', 'b\'', 'c\'', 'd\'']}
