@@ -131,7 +131,7 @@ class Relay21:
         return trip_signal
 
 
-class _Relay32Base(ABC):
+class _32Base(ABC):
     def __init__(self, alpha: float, beta: float) -> None:
         """Classe abstrata para relés 32.
 
@@ -155,7 +155,7 @@ class _Relay32Base(ABC):
         raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
 
-class PhaseRelay32(_Relay32Base):
+class Phase32(_32Base):
     def __init__(self, alpha: float, beta: float, phasors: Signals, ) -> None:
         """Implementa a lógica de atuação do relé 32 de fase.
 
@@ -211,7 +211,7 @@ class PhaseRelay32(_Relay32Base):
                 raise ValueError("O valor de alfa deve ser 30, 60 ou 90.")
 
 
-class NeutralRelay32(_Relay32Base):
+class Neutral32(_32Base):
     def __init__(
         self,
         alpha: float,
@@ -260,7 +260,7 @@ class NeutralRelay32(_Relay32Base):
                 raise ValueError("O valor de alfa deve ser 30, 60 ou 90.")
 
 
-class _OvercurrentRelayBase(ABC):
+class _OvercurrentBase(ABC):
     def __init__(self, adjust_current: float, time_vector: numeric_array) -> None:
         """Classe abstrata para relés de sobrecorrente.
 
@@ -299,7 +299,7 @@ class _OvercurrentRelayBase(ABC):
         raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
 
-class _Relay50Base(_OvercurrentRelayBase):
+class _50Base(_OvercurrentBase):
     def __init__(self, adjust_current: float, time_vector: numeric_array) -> None:
         """Classe abstrata para relés de sobrecorrente temporizados.
 
@@ -326,7 +326,7 @@ class _Relay50Base(_OvercurrentRelayBase):
         return trip_times
 
 
-class PhaseRelay50(_Relay50Base):
+class Phase50(_50Base):
     def __init__(self, adjust_current: float, time_vector: numeric_array, current_phasors: Signals) -> None:
         """Implementa a lógica de atuação do relé 50 para cada fase.
 
@@ -349,7 +349,7 @@ class PhaseRelay50(_Relay50Base):
         return min_trip_times
 
 
-class NeutralRelay50(_Relay50Base):
+class Neutral50(_50Base):
     def __init__(self, adjust_current: float, time_vector: numeric_array, neutral_current: numeric_array) -> None:
         """Implementa a lógica de atuação do relé 50 para a corrente de neutro.
 
@@ -367,7 +367,7 @@ class NeutralRelay50(_Relay50Base):
         return {"neutral": np.min(trip_time)}
 
 
-class _Relay51Base(_OvercurrentRelayBase):
+class _51Base(_OvercurrentBase):
     ADJUST_OFFSET = 0.01
 
     def __init__(self, gamma: float, adjust_current: float, curve: str, time_vector: numeric_array) -> None:
@@ -394,7 +394,7 @@ class _Relay51Base(_OvercurrentRelayBase):
         """
         normalized_current = np.where(
             secondary_current == self._adjust_current,
-            self._adjust_current + _Relay51Base.ADJUST_OFFSET,
+            self._adjust_current + _51Base.ADJUST_OFFSET,
             secondary_current,
         ) / self._adjust_current
 
@@ -420,7 +420,7 @@ class _Relay51Base(_OvercurrentRelayBase):
         raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
 
-class PhaseRelay51(_Relay51Base):
+class Phase51(_51Base):
     def __init__(
         self,
         gamma: float,
@@ -451,7 +451,7 @@ class PhaseRelay51(_Relay51Base):
         return min_trip_times
 
 
-class NeutralRelay51(_Relay51Base):
+class Neutral51(_51Base):
     def __init__(
         self,
         gamma: float,
@@ -478,7 +478,7 @@ class NeutralRelay51(_Relay51Base):
         return {"neutral": np.min(trip_time)}
 
 
-class _Relay67Base(ABC):
+class _67Base(ABC):
     def __init__(
         self,
         trips: dict[str, dict[str, np.float64 | np.bool_]],
@@ -519,7 +519,7 @@ class _Relay67Base(ABC):
         raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
 
-class PhaseRelay67(_Relay67Base):
+class Phase67(_67Base):
     def __init__(
         self,
         trips: dict[str, dict[str, np.float64 | np.bool_]],
@@ -559,7 +559,7 @@ class PhaseRelay67(_Relay67Base):
         return trip_signal
 
 
-class NeutralRelay67(_Relay67Base):
+class Neutral67(_67Base):
     def __init__(
         self,
         trips: dict[str, dict[str, np.float64 | np.bool_]],
