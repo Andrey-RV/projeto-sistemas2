@@ -89,11 +89,11 @@ class Ied:
             key: {} for key in ['50N', '50F', '51N', '51F', '32F', '32N', '67F', '67N', '21']
         }
 
-        self.__refer_to_secondary(should_be_referred)
-        self.__apply_anti_aliasing_filter()
-        self.__resample_signals()
-        self.__apply_mimic_filter()
-        self.__estimate_phasors()
+        self._refer_to_secondary(should_be_referred)
+        self._apply_anti_aliasing_filter()
+        self._resample_signals()
+        self._apply_mimic_filter()
+        self._estimate_phasors()
 
     @property
     def phasors(self) -> Signals:
@@ -103,7 +103,7 @@ class Ied:
     def relays(self) -> dict[str, RelayType]:
         return self._relays
 
-    def __refer_to_secondary(self, should_be_referred: bool) -> None:
+    def _refer_to_secondary(self, should_be_referred: bool) -> None:
         '''Atualiza os sinais para a referência secundária caso os dados passados para o IED estejam na referência
         primária.
         Args:
@@ -119,7 +119,7 @@ class Ied:
             for voltage_name, voltage_value in self._signals.get_voltages():
                 self._signals[voltage_name] = voltage_value / self._RTPC  # type: ignore
 
-    def __apply_anti_aliasing_filter(self) -> None:
+    def _apply_anti_aliasing_filter(self) -> None:
         '''Aplica o filtro de antialiasing aos sinais de tensão e corrente com o auxílio da classe AntiAliasingFilter,
         salvando os sinais filtrados na propriedade aa_signals.
 
@@ -132,7 +132,7 @@ class Ied:
         for signal_name, signal_data in self._signals:
             self._aa_signals[signal_name] = self._aa_filter.apply_filter(signal_data)  # type: ignore
 
-    def __resample_signals(self) -> None:
+    def _resample_signals(self) -> None:
         '''Realiza o downsampling dos sinais aa_signals com o fator de decimação md e salva os novos sinais na
         propriedade resampled_aa_signals.
 
@@ -146,7 +146,7 @@ class Ied:
         for name, data in self._aa_signals:
             self._resampled_aa_signals[name] = np.array(data[:: self._md])
 
-    def __apply_mimic_filter(self) -> None:
+    def _apply_mimic_filter(self) -> None:
         '''Aplica o filtro MIMIC aos sinais resampledados e salva os sinais filtrados na propriedade
         mimic_filtered_signals.
 
@@ -165,7 +165,7 @@ class Ied:
         for signal_name, signal_data in self._resampled_aa_signals:
             self._mimic_filtered_signals[signal_name] = self._mimic_filter.apply_filter(signal_data)  # type: ignore
 
-    def __estimate_phasors(self) -> None:
+    def _estimate_phasors(self) -> None:
         '''Estima os fasores de tensão e corrente com o auxílio da classe PhasorEstimator.
 
         Returns:
