@@ -199,25 +199,25 @@ class Ied:
         match relay_type:
             case '51N':
                 relay_instance = relays.Neutral51(
-                    time_vector=self._mimic_filtered_signals.t,
+                    time_vector=self.phasors.t,
                     neutral_current=self._phasors['in'].astype(np.complex128),  # type: ignore
                     **kwargs,
                 )
             case '51F':
                 relay_instance = relays.Phase51(
-                    time_vector=self._mimic_filtered_signals.t,
+                    time_vector=self.phasors.t,
                     current_phasors=self._phasors,
                     **kwargs,
                 )
             case '50N':
                 relay_instance = relays.Neutral50(
-                    time_vector=self._mimic_filtered_signals.t,
+                    time_vector=self.phasors.t,
                     neutral_current=self._phasors['in'].astype(np.complex128),  # type: ignore
                     **kwargs,
                 )
             case '50F':
                 relay_instance = relays.Phase50(
-                    time_vector=self._mimic_filtered_signals.t,
+                    time_vector=self.phasors.t,
                     current_phasors=self._phasors,
                     **kwargs,
                 )
@@ -235,12 +235,12 @@ class Ied:
             case '67F':
                 relay_instance = relays.Phase67(
                     trips=self._trips,
-                    time_vector=self._mimic_filtered_signals.t,
+                    time_vector=self.phasors.t,
                 )
             case '67N':
                 relay_instance = relays.Neutral67(
                     trips=self._trips,
-                    time_vector=self._mimic_filtered_signals.t,
+                    time_vector=self.phasors.t,
                 )
             case '21':
                 relay_instance = relays.Relay21(
