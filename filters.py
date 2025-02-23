@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
-from scipy.signal import sosfilt
+from scipy.signal import sosfilt  # type: ignore
 
 
 class AntiAliasingFilter:
@@ -43,7 +43,7 @@ class AntiAliasingFilter:
             Returns:
                 npt.NDArray[np.floating]: O sinal filtrado.
         '''
-        return sosfilt(self._sos, signal)
+        return sosfilt(self._sos, signal)  # type: ignore
 
 
 class FourierFilter:
@@ -107,4 +107,4 @@ class MimicFilter:
             ou, no domínio Z:
             $$H(z) = \frac{k(1 + \tau) - k\tau z^{-1}}{1}$$
         '''
-        return sosfilt(self._sos, signal)
+        return sosfilt(self._sos, signal)  # type: ignore
