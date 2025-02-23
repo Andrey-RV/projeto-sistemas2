@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.figure import Figure
-from typing import Sequence, List, Dict, Tuple
+from typing import Sequence
 from ied import Ied
 from relays import Curve
 
@@ -201,7 +201,7 @@ def get_trip_curve(
     insta_adjust_current: float,
     gamma: float,
     curve: str
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Calcula a curva de atuação do relé com base nos parâmetros fornecidos.
 
@@ -222,10 +222,10 @@ def get_trip_curve(
     return currents, insta_times
 
 
-def plot_trip_curves(relays: List[str],
-                     timed_adjust_current: float,
-                     insta_adjust_current: Dict[str, float],
-                     gamma: Dict[str, float],
+def plot_trip_curves(relays: list[str],
+                     timed_adjust_current: dict[str, float],
+                     insta_adjust_current: dict[str, float],
+                     gamma: dict[str, float],
                      title: str,
                      curve: str = 'IEEE_moderately_inverse',
                      multiplier: float = 60) -> None:
@@ -244,7 +244,7 @@ def plot_trip_curves(relays: List[str],
     plt.figure(figsize=(10, 10))
     for relay in relays:
         currents, trip_times = get_trip_curve(
-            timed_adjust_current,
+            timed_adjust_current[relay],
             insta_adjust_current[relay],
             gamma[relay],
             curve=curve
