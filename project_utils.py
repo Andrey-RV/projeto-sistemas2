@@ -1,9 +1,11 @@
 from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.figure import Figure
+from matplotlib.patches import Circle
 from typing import Sequence
 from ied import Ied
 from relays import Curve
@@ -196,7 +198,7 @@ def _configure_chart() -> None:
     plt.grid()
 
 
-def get_trip_curve(
+def _get_trip_curve(
     timed_adjust_current: float,
     insta_adjust_current: float,
     gamma: float,
@@ -243,7 +245,7 @@ def plot_trip_curves(relays: list[str],
     """
     plt.figure(figsize=(10, 10))
     for relay in relays:
-        currents, trip_times = get_trip_curve(
+        currents, trip_times = _get_trip_curve(
             timed_adjust_current[relay],
             insta_adjust_current[relay],
             gamma[relay],
@@ -252,4 +254,50 @@ def plot_trip_curves(relays: list[str],
         plt.plot(currents * multiplier, trip_times, label=f'Relé {relay.upper()}')
     _configure_chart()
     plt.title(title)
+    plt.show(block=True)
+
+
+def plot_protection_zones(measured_impedances: npt.NDArray[np.complex128],
+                          zones_impedances: Sequence[Sequence[float]],
+                          unit: str,
+                          bus: int,
+                          fault: int
+                          ) -> None:
+    """Plota os círculos mohr referentes às zonas de proteção.
+
+    Args:
+        measured_impedances (npt.NDArray[np.complex128]): Impedâncias medidas como valores complexos.
+        zones_impedances (Sequence[Sequence[float]]): Lista de zonas de proteção, onde cada zona é uma sequência
+        contendo (x, y, raio).
+        unit (str): Unidade de proteção.
+        bus (int): Número da barra onde a unidade está localizada.
+        fault (int): Número da falta.
+    """
+    dx = np.diff(np.real(measured_impedances))
+    dy = np.diff(np.imag(measured_impedances))
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_title(f'Unidade {unit.upper()} na Barra {bus + 1}, Falta {fault}')
+    ax.set_xlim(-4, 4)
+    ax.set_ylim(-4, 4)
+    ax.set_aspect('equal', adjustable='datalim')
+
+    # Plot impedances
+    ax.scatter(np.real(measured_impedances), np.imag(measured_impedances), color='black', s=15)
+    ax.plot(np.real(measured_impedances), np.imag(measured_impedances), color='black', linestyle='--')
+    ax.quiver(np.real(measured_impedances)[:-1], np.imag(measured_impedances)[:-1], dx, dy,
+              angles='xy', scale_units='xy', scale=1, color='black', width=0.004)
+
+    colors = ['blue', 'green', 'red', 'purple', 'orange']
+    zone_patches = []
+    labels = []
+
+    for i, (x, y, radius) in enumerate(zones_impedances):
+        color = colors[i % len(colors)]  # Cycle through colors if more than defined
+        circle = Circle((x, y), radius, color=color, fill=False)
+        ax.add_patch(circle)
+        zone_patches.append(circle)
+        labels.append(f'Zona {i + 1}')
+
+    ax.legend(zone_patches, labels, loc='upper right')
     plt.show(block=True)
