@@ -138,9 +138,20 @@ class _32Base(ABC):
         Args:
             alpha (float): O ângulo alfa do relé.
             beta (float): O ângulo beta do relé.
+
+        Raises:
+            ValueError: O alfa deve ser 30, 60, or 90 degrees.
         """
+        if alpha not in {30, 60, 90}:
+            raise ValueError("O alfa deve be 30, 60, or 90 degrees.")
         self._alpha = alpha
         self._beta = beta
+
+    def _calculate_trip_signal(self, v_pol_angle: numeric_array, i_op_angle: numeric_array) -> npt.NDArray[np.bool_]:
+        op_region = (v_pol_angle - self._alpha + self._beta, v_pol_angle + self._alpha + self._beta)
+        is_current_inside_op_region = (i_op_angle > op_region[0]) & (i_op_angle < op_region[1])
+        avg_result = np.round(np.mean(is_current_inside_op_region), 0).astype(bool)
+        return np.full_like(i_op_angle, avg_result, dtype=bool)
 
     @abstractmethod
     def analyze_trip(self) -> StrBooleanDict:
@@ -192,20 +203,10 @@ class Phase32(_32Base):
                     phase_name[1:]: np.angle(current, deg=True)  # type: ignore
                     for phase_name, current in self._phasors.get_currents()
                 }
-                op_region = {
-                    name: (
-                        v_pol_phase[name] - self._alpha + self._beta,
-                        v_pol_phase[name] + self._alpha + self._beta
-                    )
-                    for name in ['a', 'b', 'c']
+                return {
+                    phase: self._calculate_trip_signal(v_pol_phase[phase], i_op_phase[phase])
+                    for phase in ['a', 'b', 'c']
                 }
-
-                trip_permission: dict[str, npt.NDArray[np.bool_]] = {}
-                for phase in ['a', 'b', 'c']:
-                    in_region = (i_op_phase[phase] > op_region[phase][0]) & (i_op_phase[phase] < op_region[phase][1])
-                    avg_result = np.round(np.mean(in_region), 0).astype(bool)
-                    trip_permission[phase] = np.full_like(i_op_phase[phase], avg_result, dtype=bool)
-                return trip_permission
 
             case _:
                 raise ValueError("O valor de alfa deve ser 30, 60 ou 90.")
@@ -247,14 +248,9 @@ class Neutral32(_32Base):
             case 60:
                 raise NotImplementedError("Relé 32 de neutro com alfa igual a 60 graus ainda não foi implementado.")
             case 90:
-                v_pol_phase = np.angle(self._zero_seq_voltage, deg=True)  # type: ignore
-                i_op_phase = np.angle(self._zero_seq_current, deg=True)  # type: ignore
-                op_region = (v_pol_phase - self._alpha + self._beta, v_pol_phase + self._alpha + self._beta)
-                in_region = (i_op_phase > op_region[0]) & (i_op_phase < op_region[1])
-
-                avg_result = np.round(np.mean(in_region), 0).astype(bool)
-                trip_permission = np.full_like(i_op_phase, avg_result, dtype=bool)
-                return {'neutral': trip_permission}
+                v_pol_angle = np.angle(self._zero_seq_voltage, deg=True)  # type: ignore
+                i_op_angle = np.angle(self._zero_seq_current, deg=True)  # type: ignore
+                return {"neutral": self._calculate_trip_signal(v_pol_angle, i_op_angle)}
 
             case _:
                 raise ValueError("O valor de alfa deve ser 30, 60 ou 90.")
@@ -287,43 +283,44 @@ class _OvercurrentBase(ABC):
         raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
     @abstractmethod
-    def analyze_trip(self) -> dict[str, number]:
-        """Método abstrato para análise de trip do relé.
+    def _get_current_signals(self) -> dict[str, numeric_array]:
+        """Método abstrato para obtenção dos sinais de corrente.
 
         Raises:
             NotImplementedError: Deve ser implementado nas subclasses.
 
         Returns:
-            dict[str, number]: O menor tempo de atuação do relé para cada fase.
+            dict[str, numeric_array]: Os sinais de corrente.
         """
         raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
+    def analyze_trip(self) -> dict[str, number]:
+        """Calcula o menor tempo de atuação do relé para cada fase.
+
+        Returns:
+            dict[str, number]: O menor tempo de atuação do relé para cada fase.
+        """
+        current_signals = self._get_current_signals()
+        trip_times = {
+            name: self._calculate_trip_time(np.abs(current))
+            for name, current in current_signals.items()
+        }
+        return {name: np.min(times) for name, times in trip_times.items()}
+
 
 class _50Base(_OvercurrentBase):
-    def __init__(self, adjust_current: float, time_vector: numeric_array) -> None:
-        """Classe abstrata para relés de sobrecorrente temporizados.
-
-        Args:
-            adjust_current (float): A corrente de ajuste do relé 50 (referida ao secundário do TC).
-            time_vector (numeric_array): O vetor de tempo.
-        """
-        super().__init__(adjust_current, time_vector)
+    """Classe abstrata para relés 50."""
 
     def _calculate_trip_time(self, secondary_current: numeric_array) -> numeric_array:
-        """Calcula o tempo de atuação do relé 50 para cada par corrente-tempo.
+        """Calcula o tempo de atuação do relé 50.
 
         Args:
             secondary_current (numeric_array): Os valores de corrente já ajustados para o secundário do TC.
 
         Returns:
-            numeric_array: O tempo de atuação do relé 50.
+            numeric_array: O tempo de atuação do relé 50 para a corrente (fases ou neutro a depender da subclasse).
         """
-        trip_times = np.where(
-            secondary_current <= self._adjust_current,
-            np.inf,
-            self._time_vector,
-        )
-        return trip_times
+        return np.where(secondary_current <= self._adjust_current, np.inf, self._time_vector)
 
 
 class Phase50(_50Base):
@@ -338,15 +335,13 @@ class Phase50(_50Base):
         super().__init__(adjust_current, time_vector)
         self._phasors = current_phasors
 
-    def analyze_trip(self) -> dict[str, number]:
-        """Calcula o tempo de atuação do relé 50 para cada fase."""
-        trip_times = {
-            current_name: self._calculate_trip_time(secondary_current=np.abs(current_value))
-            for current_name, current_value in self._phasors.get_currents()
-        }
+    def _get_current_signals(self) -> dict[str, numeric_array]:
+        """Retorna as correntes de fase.
 
-        min_trip_times = {current: np.min(times) for current, times in trip_times.items()}
-        return min_trip_times
+        Returns:
+            dict[str, numeric_array]: As correntes de fase.
+        """
+        return {name: value for name, value in self._phasors.get_currents()}
 
 
 class Neutral50(_50Base):
@@ -361,10 +356,13 @@ class Neutral50(_50Base):
         super().__init__(adjust_current, time_vector)
         self._neutral_current = neutral_current
 
-    def analyze_trip(self) -> dict[str, number]:
-        """Calcula o tempo de atuação do relé 50 para a corrente de neutro."""
-        trip_time = self._calculate_trip_time(secondary_current=np.abs(self._neutral_current))
-        return {"neutral": np.min(trip_time)}
+    def _get_current_signals(self) -> dict[str, numeric_array]:
+        """Retorna a corrente de neutro.
+
+        Returns:
+            dict[str, numeric_array]: A corrente de neutro.
+        """
+        return {"neutral": self._neutral_current}
 
 
 class _51Base(_OvercurrentBase):
@@ -394,30 +392,17 @@ class _51Base(_OvercurrentBase):
         """
         normalized_current = np.where(
             secondary_current == self._adjust_current,
-            self._adjust_current + _51Base.ADJUST_OFFSET,
+            self._adjust_current + self.ADJUST_OFFSET,
             secondary_current,
         ) / self._adjust_current
 
         curve_common_term = self._gamma * (self._k / ((normalized_current) ** self._a - 1) + self._c)
 
-        trip_times = np.where(
+        return np.where(
             secondary_current <= self._adjust_current,
             np.inf,
             self._time_vector + curve_common_term,
         )
-        return trip_times
-
-    @abstractmethod
-    def analyze_trip(self) -> dict[str, np.number]:
-        """Método abstrato para análise de trip do relé 51.
-
-        Raises:
-            NotImplementedError: Deve ser implementado nas subclasses.
-
-        Returns:
-            dict[str, np.number]: O menor tempo de atuação do relé para cada fase.
-        """
-        raise NotImplementedError("Esse método deve ser implementado nas subclasses.")
 
 
 class Phase51(_51Base):
@@ -441,14 +426,13 @@ class Phase51(_51Base):
         super().__init__(gamma, adjust_current, curve, time_vector)
         self._phasors = current_phasors
 
-    def analyze_trip(self) -> dict[str, number]:
-        """Calcula o tempo de atuação do relé 51 para cada fase."""
-        trip_times = {
-            current_name: self._calculate_trip_time(secondary_current=np.abs(current_value))
-            for current_name, current_value in self._phasors.get_currents()
-        }
-        min_trip_times = {name: np.min(times) for name, times in trip_times.items()}
-        return min_trip_times
+    def _get_current_signals(self) -> dict[str, numeric_array]:
+        """Retorna as correntes de fase.
+
+        Returns:
+            dict[str, numeric_array]: As correntes de fase.
+        """
+        return {name: value for name, value in self._phasors.get_currents()}
 
 
 class Neutral51(_51Base):
@@ -472,10 +456,13 @@ class Neutral51(_51Base):
         super().__init__(gamma, adjust_current, curve, time_vector)
         self._neutral_current = neutral_current
 
-    def analyze_trip(self) -> dict[str, number]:
-        """Calcula o tempo de atuação do relé 51 para a corrente de neutro."""
-        trip_time = self._calculate_trip_time(secondary_current=np.abs(self._neutral_current))
-        return {"neutral": np.min(trip_time)}
+    def _get_current_signals(self) -> dict[str, numeric_array]:
+        """Retorna a corrente de neutro.
+
+        Returns:
+            dict[str, numeric_array]: A corrente de neutro.
+        """
+        return {"neutral": self._neutral_current}
 
 
 class _67Base(ABC):
